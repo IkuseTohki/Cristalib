@@ -1,0 +1,94 @@
+<svg width="600" height="700" viewBox="0 0 600 700" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="blur">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" />
+    </filter>
+    
+    <filter id="glass-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset in="blur" dx="0" dy="4" result="offsetBlur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.2"/>
+      <feComposite in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="600" height="700" fill="url(#bgGradient)"/>
+  
+  <!-- Decorative blurred circles -->
+  <circle cx="120" cy="150" r="90" fill="#ffffff" opacity="0.1" filter="url(#blur)"/>
+  <circle cx="480" cy="400" r="110" fill="#ffffff" opacity="0.08" filter="url(#blur)"/>
+  <circle cx="550" cy="150" r="70" fill="#764ba2" opacity="0.15" filter="url(#blur)"/>
+  <circle cx="100" cy="600" r="80" fill="#ffffff" opacity="0.09" filter="url(#blur)"/>
+
+  <!-- Header -->
+  <rect x="10" y="10" width="580" height="40" fill="rgba(255, 255, 255, 0.15)" rx="10" ry="10" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="20" y="35" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="18" fill="#ffffff" font-weight="600">設定</text>
+
+  <!-- Folder Management Section -->
+  <rect x="10" y="60" width="580" height="200" fill="rgba(255, 255, 255, 0.15)" rx="10" ry="10" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="20" y="85" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="16" fill="#ffffff" font-weight="600">フォルダ管理</text>
+
+  <text x="30" y="115" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="500">スキャン対象フォルダ:</text>
+  <rect x="30" y="125" width="400" height="25" fill="rgba(255, 255, 255, 0.1)" rx="5" ry="5" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1"/>
+  <text x="440" y="142" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="12" fill="rgba(255, 255, 255, 0.8)">プライベート</text>
+  <rect x="490" y="130" width="15" height="15" fill="rgba(255, 255, 255, 0.2)" rx="3" ry="3" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1"/>
+  <rect x="510" y="125" width="30" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="525" y="141" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="11" fill="#ffffff" font-weight="500">追加</text>
+  <rect x="545" y="125" width="30" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="560" y="141" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="11" fill="#ffffff" font-weight="500">削除</text>
+
+  <text x="30" y="175" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="500">除外フォルダ:</text>
+  <rect x="30" y="185" width="400" height="25" fill="rgba(255, 255, 255, 0.1)" rx="5" ry="5" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1"/>
+  <rect x="510" y="185" width="30" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="525" y="201" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="11" fill="#ffffff" font-weight="500">追加</text>
+  <rect x="545" y="185" width="30" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="560" y="201" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="11" fill="#ffffff" font-weight="500">削除</text>
+
+  <!-- Security Settings Section -->
+  <rect x="10" y="270" width="580" height="100" fill="rgba(255, 255, 255, 0.15)" rx="10" ry="10" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="20" y="295" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="16" fill="#ffffff" font-weight="600">セキュリティ設定</text>
+  <text x="30" y="332" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="500">パスワード設定/変更:</text>
+  <rect x="200" y="315" width="150" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="275" y="332" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="12" fill="#ffffff" font-weight="500">パスワード変更</text>
+
+  <!-- Viewer Settings Section -->
+  <rect x="10" y="380" width="580" height="100" fill="rgba(255, 255, 255, 0.15)" rx="10" ry="10" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="20" y="405" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="16" fill="#ffffff" font-weight="600">ビューア設定</text>
+  <text x="30" y="442" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="500">外部ビューアパス:</text>
+  <rect x="170" y="425" width="300" height="25" fill="rgba(255, 255, 255, 0.1)" rx="5" ry="5" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1"/>
+  <rect x="480" y="425" width="80" height="25" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="520" y="442" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="12" fill="#ffffff" font-weight="500">参照</text>
+
+  <!-- Save/Cancel Buttons -->
+  <rect x="10" y="650" width="580" height="40" fill="rgba(255, 255, 255, 0.15)" rx="10" ry="10" 
+        stroke="rgba(255, 255, 255, 0.3)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <rect x="400" y="655" width="80" height="30" fill="rgba(255, 255, 255, 0.25)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="440" y="675" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="600">保存</text>
+  <rect x="490" y="655" width="80" height="30" fill="rgba(255, 255, 255, 0.2)" rx="8" ry="8" 
+        stroke="rgba(255, 255, 255, 0.4)" stroke-width="1" style="filter:url(#glass-shadow);"/>
+  <text x="530" y="675" text-anchor="middle" font-family="游ゴシック, Yu Gothic, sans-serif" font-size="14" fill="#ffffff" font-weight="500">キャンセル</text>
+</svg>
