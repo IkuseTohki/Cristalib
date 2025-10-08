@@ -102,6 +102,14 @@ class DatabaseManager:
             conn.execute("DELETE FROM books WHERE file_hash = ?", (file_hash,))
             conn.commit()
 
+    def update_book(self, book: Book):
+        with self.get_connection() as conn:
+            conn.execute(
+                "UPDATE books SET title=?, subtitle=?, volume=?, author=?, original_author=?, series=?, category=?, rating=?, is_magazine_collection=? WHERE id=?",
+                (book.title, book.subtitle, book.volume, book.author, book.original_author, book.series, book.category, book.rating, book.is_magazine_collection, book.id)
+            )
+            conn.commit()
+
     # --- ScanFolder --- #
     def get_scan_folders(self) -> List[dict]:
         with self.get_connection() as conn:

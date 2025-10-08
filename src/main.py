@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
 from src.ui.settings_window import SettingsWindow, PasswordDialog
+from src.ui.book_edit_dialog import BookEditDialog
 from src.core.database import DatabaseManager, hash_password, verify_password
 from src.core.scanner import FileScanner
 from src.models.book import Book
@@ -29,6 +30,7 @@ class ApplicationController:
         self.main_window.viewer_button.clicked.connect(self.open_selected_book_in_viewer)
         self.main_window.book_table_view.doubleClicked.connect(self.open_selected_book_in_viewer)
         self.main_window.mode_button.clicked.connect(self.toggle_private_mode)
+        self.main_window.edit_button.clicked.connect(self.open_book_edit_dialog)
 
     def authenticate_and_open_settings(self):
         """パスワード認証後、設定ウィンドウを開く。"""
@@ -140,6 +142,33 @@ class ApplicationController:
         except Exception as e:
             QMessageBox.critical(self.main_window, "起動エラー", f"ビューアを起動できませんでした。\n{e}")
 
+    def open_book_edit_dialog(self):
+        """選択された書籍の編集ダイアログを開く。"""
+        selected_indexes = self.main_window.book_table_view.selectedIndexes()
+        if not selected_indexes:
+            QMessageBox.information(self.main_window, "情報", "編集する書籍を選択してください。")
+            return
+
+        proxy_index = selected_indexes[0]
+        source_index = self.main_window.proxy_model.mapToSource(proxy_index)
+        book: Book = self.main_window.book_table_model.itemFromIndex(source_index).data(Qt.ItemDataRole.UserRole)
+
+        if not book:
+            QMessageBox.warning(self.main_window, "エラー", "選択された書籍情報が見つかりません。")
+            return
+
+        edit_dialog = BookEditDialog(self.main_window, book=book)
+        if edit_dialog.exec():
+            updated_book = edit_dialog.get_book_data()
+            # 元の書籍のfile_path, file_hash, created_at は編集しないので引き継ぐ
+            updated_book.file_path = book.file_path
+            updated_book.file_hash = book.file_hash
+            updated_book.created_at = book.created_at
+            
+            self.db_manager.update_book(updated_book)
+            self.load_books_to_list() # リストを更新
+            QMessageBox.information(self.main_window, "成功", "書籍情報を更新しました。")
+
     def run_scan_and_refresh(self):
         self.scanner.scan_folders()
         self.load_books_to_list()
@@ -147,60 +176,40 @@ class ApplicationController:
     def load_books_to_list(self):
         """データベースから書籍を読み込み、UIに表示する。"""
         all_books = self.db_manager.get_all_books()
-        print(f"DEBUG: All books count: {len(all_books)}")
 
         if self.is_private_mode:
             books_to_display = all_books
-            print("DEBUG: Private mode active. Displaying all books.")
         else:
-            print("DEBUG: Normal mode active.")
             scan_folders_data = self.db_manager.get_scan_folders()
-            print(f"DEBUG: Scan folders data: {scan_folders_data}")
             
             scan_folder_private_status = {f['path']: f.get('is_private', 0) for f in scan_folders_data}
-            print(f"DEBUG: Scan folder private status map: {scan_folder_private_status}")
 
             books_to_display = []
             for book in all_books:
                 if not book.file_path:
-                    print(f"DEBUG: Book {book.title} has no file_path.")
                     continue
 
                 book_dir = os.path.dirname(book.file_path)
-                # パス区切り文字をスラッシュに統一
                 book_dir = book_dir.replace("\\", "/")
-                print(f"DEBUG: Processing book: {book.title}, book_dir (normalized): {book_dir})")
                 
                 is_private_for_book = 1 # デフォルトはプライベート扱い
                 
                 matched_scan_root = None
                 for scan_root_path in scan_folder_private_status.keys():
-                    # 比較前に両方のパスを正規化しておく
                     normalized_scan_root_path = scan_root_path.replace("\\", "/")
                     
                     common_path_result = os.path.commonpath([normalized_scan_root_path, book_dir])
-                    # common_path_result もスラッシュに統一
                     normalized_common_path_result = common_path_result.replace("\\", "/")
-
-                    print(f"DEBUG:   Comparing '{normalized_scan_root_path}' with '{book_dir}'. Common path: '{common_path_result}' (Normalized: '{normalized_common_path_result}')")
-                    print(f"DEBUG:   Condition: '{normalized_common_path_result}' == '{normalized_scan_root_path}' -> {normalized_common_path_result == normalized_scan_root_path}")
 
                     if normalized_common_path_result == normalized_scan_root_path:
                         if matched_scan_root is None or len(normalized_scan_root_path) > len(matched_scan_root):
                             matched_scan_root = normalized_scan_root_path
                 
                 if matched_scan_root:
-                    # is_privateの値は元のscan_folder_private_statusから取得
                     is_private_for_book = scan_folder_private_status[matched_scan_root]
-                    print(f"DEBUG: Matched scan root: {matched_scan_root}, is_private: {is_private_for_book})")
-                else:
-                    print(f"DEBUG: No scan root matched for {book_dir}. Defaulting to private.")
                 
                 if is_private_for_book == 0: # is_privateが0なら通常モードで表示
                     books_to_display.append(book)
-                    print(f"DEBUG: Book {book.title} added to display list (is_private=0).")
-                else:
-                    print(f"DEBUG: Book {book.title} NOT added to display list (is_private=1).")
 
         self.main_window.display_books(books_to_display)
 
