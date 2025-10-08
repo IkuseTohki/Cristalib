@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import sys
-from typing import List, Dict, Tuple
-from PyQt6.QtCore import QStringListModel
+from typing import List, Dict, Tuple, Optional
+from PyQt6.QtCore import QStringListModel, Qt
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLineEdit, QListView, QLabel, QGroupBox, QFileDialog
+    QPushButton, QLineEdit, QListView, QLabel, QGroupBox, QFileDialog, QMessageBox
 )
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 class SettingsWindow(QDialog):
     """設定画面のウィンドウ。"""
@@ -25,7 +26,7 @@ class SettingsWindow(QDialog):
         folder_layout.addWidget(QLabel("スキャン対象フォルダ"))
         scan_layout = QHBoxLayout()
         self.scan_list_view = QListView()
-        self.scan_list_model = QStringListModel()
+        self.scan_list_model = QStandardItemModel() # QStringListModelから変更
         self.scan_list_view.setModel(self.scan_list_model)
         scan_layout.addWidget(self.scan_list_view)
         scan_buttons = QVBoxLayout()
@@ -67,6 +68,14 @@ class SettingsWindow(QDialog):
         viewer_group.setLayout(viewer_layout)
         main_layout.addWidget(viewer_group)
 
+        # --- セキュリティ設定 --- #
+        security_group = QGroupBox("セキュリティ")
+        security_layout = QHBoxLayout()
+        self.change_password_btn = QPushButton("パスワード変更")
+        security_layout.addWidget(self.change_password_btn)
+        security_group.setLayout(security_layout)
+        main_layout.addWidget(security_group)
+
         # --- 保存/キャンセル --- #
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -81,8 +90,10 @@ class SettingsWindow(QDialog):
     def add_scan_folder(self):
         path = QFileDialog.getExistingDirectory(self, "スキャン対象フォルダを選択")
         if path:
-            self.scan_list_model.insertRow(self.scan_list_model.rowCount())
-            self.scan_list_model.setData(self.scan_list_model.index(self.scan_list_model.rowCount() - 1), path)
+            item = QStandardItem(path)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked) # デフォルトは非プライベート
+            self.scan_list_model.appendRow(item)
 
     def remove_scan_folder(self):
         for index in self.scan_list_view.selectedIndexes():
@@ -104,32 +115,85 @@ class SettingsWindow(QDialog):
             self.viewer_path_input.setText(path)
 
     def set_settings(self, scan_folders: List[Dict], exclude_folders: List[Dict], viewer_path: str):
-        self.scan_list_model.setStringList([f['path'] for f in scan_folders])
+        self.scan_list_model.clear() # モデルをクリア
+        for folder in scan_folders:
+            item = QStandardItem(folder['path'])
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if folder.get('is_private', 0) == 1 else Qt.CheckState.Unchecked)
+            self.scan_list_model.appendRow(item)
+
         self.exclude_list_model.setStringList([f['path'] for f in exclude_folders])
         self.viewer_path_input.setText(viewer_path or "")
 
     def get_settings(self) -> Tuple[List[Dict], List[Dict], str]:
-        scan_folders = [{'path': path} for path in self.scan_list_model.stringList()]
+        scan_folders = []
+        for row in range(self.scan_list_model.rowCount()):
+            item = self.scan_list_model.item(row)
+            scan_folders.append({
+                'path': item.text(),
+                'is_private': 1 if item.checkState() == Qt.CheckState.Checked else 0
+            })
+
         exclude_folders = [{'path': path} for path in self.exclude_list_model.stringList()]
         viewer_path = self.viewer_path_input.text()
         return scan_folders, exclude_folders, viewer_path
 
-# (PasswordDialogクラスは変更なし)
 class PasswordDialog(QDialog):
     """パスワード入力ダイアログ。"""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, mode: str = "authenticate"):
         super().__init__(parent)
-        self.setWindowTitle("パスワード認証")
-        layout = QVBoxLayout(self)
-        self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(QLabel("パスワードを入力してください:"))
-        layout.addWidget(self.password_input)
+        self.mode = mode
+        self.setWindowTitle("パスワード認証" if mode == "authenticate" else "パスワード設定")
+        
+        main_layout = QVBoxLayout(self)
+
+        if self.mode == "authenticate":
+            main_layout.addWidget(QLabel("パスワードを入力してください:"))
+            self.password_input = QLineEdit()
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            main_layout.addWidget(self.password_input)
+        elif self.mode == "set_password":
+            main_layout.addWidget(QLabel("新しいパスワードを入力してください:"))
+            self.new_password_input = QLineEdit()
+            self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            main_layout.addWidget(self.new_password_input)
+
+            main_layout.addWidget(QLabel("新しいパスワード (確認):"))
+            self.confirm_password_input = QLineEdit()
+            self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            main_layout.addWidget(self.confirm_password_input)
+
         button_layout = QHBoxLayout()
-        ok_button = QPushButton("OK")
+        ok_button = QPushButton("OK" if mode == "authenticate" else "設定")
         cancel_button = QPushButton("キャンセル")
-        ok_button.clicked.connect(self.accept)
+        ok_button.clicked.connect(self._handle_ok_button)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(ok_button)
         button_layout.addWidget(cancel_button)
-        layout.addLayout(button_layout)
+        main_layout.addLayout(button_layout)
+
+    def _handle_ok_button(self):
+        if self.mode == "authenticate":
+            self.accept()
+        elif self.mode == "set_password":
+            if self.validate_password_input():
+                self.accept()
+
+    def validate_password_input(self) -> bool:
+        if self.mode == "set_password":
+            new_pass = self.new_password_input.text()
+            confirm_pass = self.confirm_password_input.text()
+            if not new_pass:
+                QMessageBox.warning(self, "エラー", "パスワードを入力してください。")
+                return False
+            if new_pass != confirm_pass:
+                QMessageBox.warning(self, "エラー", "パスワードが一致しません。")
+                return False
+        return True
+
+    def get_password(self) -> Optional[str]:
+        if self.mode == "authenticate":
+            return self.password_input.text()
+        elif self.mode == "set_password":
+            return self.new_password_input.text()
+        return None

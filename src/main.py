@@ -6,12 +6,10 @@ from PyQt6.QtCore import QModelIndex, Qt
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
-from src.ui.settings_window import SettingsWindow
-from src.core.database import DatabaseManager
+from src.ui.settings_window import SettingsWindow, PasswordDialog
+from src.core.database import DatabaseManager, hash_password, verify_password
 from src.core.scanner import FileScanner
 from src.models.book import Book
-
-# convert_path_for_wsl 関数は削除
 
 class ApplicationController:
     """アプリケーション全体のロジックを管理するコントローラー。"""
@@ -20,17 +18,48 @@ class ApplicationController:
         self.db_manager.create_tables()
         self.scanner = FileScanner(self.db_manager)
         self.main_window = MainWindow()
+        self.is_private_mode = False # プライベートモードの状態
+
         self.connect_signals()
 
     def connect_signals(self):
         """UIのシグナルとロジックのスロットを接続する。"""
         self.main_window.sync_button.clicked.connect(self.run_scan_and_refresh)
-        self.main_window.settings_button.clicked.connect(self.open_settings_window)
+        self.main_window.settings_button.clicked.connect(self.authenticate_and_open_settings)
         self.main_window.viewer_button.clicked.connect(self.open_selected_book_in_viewer)
         self.main_window.book_table_view.doubleClicked.connect(self.open_selected_book_in_viewer)
+        self.main_window.mode_button.clicked.connect(self.toggle_private_mode)
 
-    def open_settings_window(self):
-        """設定ウィンドウを開き、設定を管理する。"""
+    def authenticate_and_open_settings(self):
+        """パスワード認証後、設定ウィンドウを開く。"""
+        stored_hash = self.db_manager.get_setting('password_hash')
+
+        if not stored_hash:
+            # パスワードが未設定の場合
+            QMessageBox.information(self.main_window, "パスワード設定", "初回起動です。パスワードを設定してください。")
+            set_password_dialog = PasswordDialog(self.main_window, mode="set_password")
+            if set_password_dialog.exec():
+                new_password = set_password_dialog.get_password()
+                if new_password:
+                    self.db_manager.set_setting('password_hash', hash_password(new_password))
+                    QMessageBox.information(self.main_window, "成功", "パスワードが設定されました。")
+                    self._open_settings_window_internal() # 設定後、設定画面を開く
+            else:
+                QMessageBox.warning(self.main_window, "キャンセル", "パスワード設定がキャンセルされました。")
+        else:
+            # パスワードが設定済みの場合
+            auth_dialog = PasswordDialog(self.main_window, mode="authenticate")
+            if auth_dialog.exec():
+                entered_password = auth_dialog.get_password()
+                if verify_password(stored_hash, entered_password):
+                    self._open_settings_window_internal()
+                else:
+                    QMessageBox.warning(self.main_window, "認証失敗", "パスワードが正しくありません。")
+            else:
+                QMessageBox.information(self.main_window, "キャンセル", "認証がキャンセルされました。")
+
+    def _open_settings_window_internal(self):
+        """認証後に設定ウィンドウを開く内部メソッド。"""
         settings_dialog = SettingsWindow(self.main_window)
         scan_folders = self.db_manager.get_scan_folders()
         exclude_folders = self.db_manager.get_exclude_folders()
@@ -43,6 +72,32 @@ class ApplicationController:
             self.db_manager.save_exclude_folders(new_exclude)
             self.db_manager.set_setting('viewer_path', new_viewer)
             print("設定を保存しました。")
+
+    def toggle_private_mode(self):
+        """プライベートモードの切り替え。"""
+        if self.is_private_mode:
+            # プライベートモードから通常モードへ
+            self.is_private_mode = False
+            self.main_window.mode_button.setText("プライベートモードへ")
+            self.load_books_to_list() # リストを更新
+        else:
+            # 通常モードからプライベートモードへ (認証が必要)
+            stored_hash = self.db_manager.get_setting('password_hash')
+            if not stored_hash:
+                QMessageBox.information(self.main_window, "パスワード未設定", "プライベートモードを使用するには、まず設定画面でパスワードを設定してください。")
+                return
+
+            auth_dialog = PasswordDialog(self.main_window, mode="authenticate")
+            if auth_dialog.exec():
+                entered_password = auth_dialog.get_password()
+                if verify_password(stored_hash, entered_password):
+                    self.is_private_mode = True
+                    self.main_window.mode_button.setText("通常モードへ")
+                    self.load_books_to_list() # リストを更新
+                else:
+                    QMessageBox.warning(self.main_window, "認証失敗", "パスワードが正しくありません。")
+            else:
+                QMessageBox.information(self.main_window, "キャンセル", "認証がキャンセルされました。")
 
     def open_selected_book_in_viewer(self):
         """テーブルで選択されている書籍をビューアで開く。"""
@@ -90,10 +145,67 @@ class ApplicationController:
         self.load_books_to_list()
 
     def load_books_to_list(self):
-        books = self.db_manager.get_all_books()
-        self.main_window.display_books(books)
+        """データベースから書籍を読み込み、UIに表示する。"""
+        all_books = self.db_manager.get_all_books()
+        print(f"DEBUG: All books count: {len(all_books)}")
+
+        if self.is_private_mode:
+            books_to_display = all_books
+            print("DEBUG: Private mode active. Displaying all books.")
+        else:
+            print("DEBUG: Normal mode active.")
+            scan_folders_data = self.db_manager.get_scan_folders()
+            print(f"DEBUG: Scan folders data: {scan_folders_data}")
+            
+            scan_folder_private_status = {f['path']: f.get('is_private', 0) for f in scan_folders_data}
+            print(f"DEBUG: Scan folder private status map: {scan_folder_private_status}")
+
+            books_to_display = []
+            for book in all_books:
+                if not book.file_path:
+                    print(f"DEBUG: Book {book.title} has no file_path.")
+                    continue
+
+                book_dir = os.path.dirname(book.file_path)
+                # パス区切り文字をスラッシュに統一
+                book_dir = book_dir.replace("\\", "/")
+                print(f"DEBUG: Processing book: {book.title}, book_dir (normalized): {book_dir})")
+                
+                is_private_for_book = 1 # デフォルトはプライベート扱い
+                
+                matched_scan_root = None
+                for scan_root_path in scan_folder_private_status.keys():
+                    # 比較前に両方のパスを正規化しておく
+                    normalized_scan_root_path = scan_root_path.replace("\\", "/")
+                    
+                    common_path_result = os.path.commonpath([normalized_scan_root_path, book_dir])
+                    # common_path_result もスラッシュに統一
+                    normalized_common_path_result = common_path_result.replace("\\", "/")
+
+                    print(f"DEBUG:   Comparing '{normalized_scan_root_path}' with '{book_dir}'. Common path: '{common_path_result}' (Normalized: '{normalized_common_path_result}')")
+                    print(f"DEBUG:   Condition: '{normalized_common_path_result}' == '{normalized_scan_root_path}' -> {normalized_common_path_result == normalized_scan_root_path}")
+
+                    if normalized_common_path_result == normalized_scan_root_path:
+                        if matched_scan_root is None or len(normalized_scan_root_path) > len(matched_scan_root):
+                            matched_scan_root = normalized_scan_root_path
+                
+                if matched_scan_root:
+                    # is_privateの値は元のscan_folder_private_statusから取得
+                    is_private_for_book = scan_folder_private_status[matched_scan_root]
+                    print(f"DEBUG: Matched scan root: {matched_scan_root}, is_private: {is_private_for_book})")
+                else:
+                    print(f"DEBUG: No scan root matched for {book_dir}. Defaulting to private.")
+                
+                if is_private_for_book == 0: # is_privateが0なら通常モードで表示
+                    books_to_display.append(book)
+                    print(f"DEBUG: Book {book.title} added to display list (is_private=0).")
+                else:
+                    print(f"DEBUG: Book {book.title} NOT added to display list (is_private=1).")
+
+        self.main_window.display_books(books_to_display)
 
     def run(self):
+        """アプリケーションを実行する。"""
         self.main_window.show()
         self.load_books_to_list()
 

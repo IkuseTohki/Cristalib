@@ -1,9 +1,24 @@
 # -*- coding: utf-8 -*-
 import sqlite3
 import os
+import hashlib
+import secrets
 from contextlib import contextmanager
 from typing import List, Optional
 from src.models.book import Book
+
+# --- パスワードハッシュ化ヘルパー関数 ---
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16) # 16バイトのランダムなソルトを生成
+    hashed_password = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+    return f"{salt}:{hashed_password}"
+
+def verify_password(stored_password_hash: str, provided_password: str) -> bool:
+    if not stored_password_hash or ':' not in stored_password_hash:
+        return False # ハッシュ形式が不正
+    salt, stored_hash = stored_password_hash.split(':')
+    provided_hashed_password = hashlib.sha256((provided_password + salt).encode('utf-8')).hexdigest()
+    return secrets.compare_digest(stored_hash, provided_hashed_password)
 
 class DatabaseManager:
     """
