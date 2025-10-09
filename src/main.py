@@ -2,6 +2,7 @@
 import sys
 import os
 import subprocess
+import json
 from PyQt6.QtCore import QModelIndex, Qt
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QFont
@@ -212,20 +213,59 @@ class ApplicationController:
                     books_to_display.append(book)
 
         self.main_window.display_books(books_to_display)
+        self.load_column_settings() # 列設定をロード
 
     def run(self):
         """アプリケーションを実行する。"""
         self.main_window.show()
         self.load_books_to_list()
 
+    def load_column_settings(self):
+        """保存された列の表示状態と幅を読み込み、適用する。"""
+        visibility_json = self.db_manager.get_setting('column_visibility')
+        widths_json = self.db_manager.get_setting('column_widths')
+        
+        settings = {}
+        if visibility_json:
+            try:
+                settings['visibility'] = json.loads(visibility_json)
+            except json.JSONDecodeError:
+                print("Warning: Failed to decode column visibility settings.")
+        if widths_json:
+            try:
+                settings['widths'] = json.loads(widths_json)
+            except json.JSONDecodeError:
+                print("Warning: Failed to decode column widths settings.")
+        
+        if settings:
+            self.main_window.apply_column_settings(settings)
+
+    def save_column_settings(self):
+        """現在の列の表示状態と幅を保存する。"""
+        settings = self.main_window.get_column_settings()
+        
+        visibility_json = json.dumps(settings['visibility'])
+        widths_json = json.dumps(settings['widths'])
+        
+        self.db_manager.set_setting('column_visibility', visibility_json)
+        self.db_manager.set_setting('column_widths', widths_json)
+        print("Column settings saved.")
+
 def main():
     """アプリケーションのメインエントリポイント。"""
     app = QApplication(sys.argv)
+    # アプリケーション終了時に設定を保存するシグナルを接続
+    app.aboutToQuit.connect(lambda: controller.save_column_settings())
+
     # フォント設定
     font = QFont("Yu Gothic UI", 12) # Windows環境を想定し、Yu Gothic UIを優先
     font.setStyleHint(QFont.StyleHint.System) # システムのフォントヒントを使用
     app.setFont(font)
     controller = ApplicationController()
+
+    # アプリケーション終了時に設定を保存するシグナルを接続
+    app.aboutToQuit.connect(lambda: controller.save_column_settings())
+
     controller.run()
     sys.exit(app.exec())
 

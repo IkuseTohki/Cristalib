@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
-from typing import List
+from typing import List, Dict
 from datetime import datetime
 from PyQt6.QtCore import QSortFilterProxyModel, Qt
 from PyQt6.QtWidgets import (
@@ -130,8 +130,7 @@ class MainWindow(QMainWindow):
             ])
         self.book_table_view.resizeColumnsToContents()
 
-        # 列の表示/非表示メニューを更新
-        self.update_column_visibility_menu()
+        # 列の表示/非表示メニューを更新 (apply_column_settingsで呼び出すため削除)
 
     def update_column_visibility_menu(self):
         """列の表示/非表示を切り替えるメニューを更新する。"""
@@ -144,3 +143,26 @@ class MainWindow(QMainWindow):
                 action.setCheckable(True)
                 action.setChecked(not self.book_table_view.isColumnHidden(i))
                 action.toggled.connect(lambda checked, col=i: self.book_table_view.setColumnHidden(col, not checked))
+
+    def get_column_settings(self) -> Dict:
+        """現在の列の表示状態と幅を取得する。"""
+        visibility = {}
+        widths = {}
+        for i in range(self.book_table_model.columnCount()):
+            visibility[i] = self.book_table_view.isColumnHidden(i)
+            widths[i] = self.book_table_view.columnWidth(i)
+        return {'visibility': visibility, 'widths': widths}
+
+    def apply_column_settings(self, settings: Dict):
+        """保存された列の表示状態と幅を適用する。"""
+        if 'visibility' in settings:
+            for i_str, is_hidden in settings['visibility'].items():
+                i = int(i_str) # 文字列を整数に変換
+                if i < self.book_table_model.columnCount():
+                    self.book_table_view.setColumnHidden(i, is_hidden)
+        if 'widths' in settings:
+            for i_str, width in settings['widths'].items():
+                i = int(i_str) # 文字列を整数に変換
+                if i < self.book_table_model.columnCount():
+                    self.book_table_view.setColumnWidth(i, width)
+        self.update_column_visibility_menu() # メニューの状態も更新
