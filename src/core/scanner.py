@@ -11,9 +11,9 @@ class FileScanner:
     """
     ファイルシステムをスキャンし、データベースと同期するクラス。
     """
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager: DatabaseManager, parser: FileNameParser):
         self.db_manager = db_manager
-        self.parser = FileNameParser()
+        self.parser = parser
 
     def _calculate_hash(self, file_path: str) -> str:
         sha256 = hashlib.sha256()

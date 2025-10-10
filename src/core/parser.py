@@ -2,38 +2,55 @@
 import json
 import re
 import os
+from typing import List, Dict
 from src.models.book import Book
+
+class ParsingRuleLoader:
+    """
+    ファイル名解析ルールをJSONファイルから読み込むクラス。
+    """
+    def __init__(self, rules_path: str):
+        self.rules_path = rules_path
+
+    def load_rules(self) -> List[Dict]:
+        """
+        解析ルールをJSONファイルから読み込み、優先度順にソートして返す。
+        """
+        if not os.path.exists(self.rules_path):
+            # ファイルが存在しない場合は空のルールリストを返す
+            # またはデフォルトのハードコードされたルールを返す
+            # 現状はハードコードされたルールを返すことで、ファイルがない場合でも動作を保証
+            hardcoded_rules = [
+              {
+                "name": "[著者] タイトル 第N巻 (雑誌版対応)",
+                "regex": r"\[(?P<author>.+?)\]\s*(?P<title>.+?)\s*第(?P<volume>\d+)巻(?P<magazine_flag>\s*\(雑誌寄せ集め\))?.*",
+                "priority": 1
+              },
+              {
+                "name": "タイトル N巻 (著者) (雑誌版対応)",
+                "regex": r"(?P<title>.+?)\s*(?P<volume>\d+)\s*\((?P<author>.+?)\)(?P<magazine_flag>\s*\(雑誌寄せ集め\))?.*",
+                "priority": 2
+              }
+            ]
+            hardcoded_rules.sort(key=lambda x: x.get('priority', 999))
+            return hardcoded_rules
+        
+        with open(self.rules_path, 'r', encoding='utf-8') as f:
+            rules = json.load(f)
+        
+        rules.sort(key=lambda x: x.get('priority', 999))
+        return rules
 
 class FileNameParser:
     """
     ファイル名から書籍情報を解析するクラス。
     """
-    def __init__(self, rules_path='config/parsing_rules.json'): # 引数は残しますが、現在使用しません
+    def __init__(self, rules: List[Dict]):
         """
-        コンストラクタ。解析ルールをコード内に直接定義して読み込む。
+        コンストラクタ。読み込まれた解析ルールを受け取る。
+        :param rules: 読み込まれ、ソート済みの解析ルールリスト。
         """
-        self.rules = self._load_rules()
-
-    def _load_rules(self):
-        """
-        解析ルールをハードコードされたリストから読み込み、優先度順にソートして返す。
-        JSONファイルの読み込みは一時的に停止しています。
-        """
-        hardcoded_rules = [
-          {
-            "name": "[著者] タイトル 第N巻 (雑誌版対応)",
-            "regex": r"\[(?P<author>.+?)\]\s*(?P<title>.+?)\s*第(?P<volume>\d+)巻(?P<magazine_flag>\s*\(雑誌寄せ集め\))?.*",
-            "priority": 1
-          },
-          {
-            "name": "タイトル N巻 (著者) (雑誌版対応)",
-            "regex": r"(?P<title>.+?)\s*(?P<volume>\d+)\s*\((?P<author>.+?)\)(?P<magazine_flag>\s*\(雑誌寄せ集め\))?.*",
-            "priority": 2
-          }
-        ]
-        
-        hardcoded_rules.sort(key=lambda x: x.get('priority', 999))
-        return hardcoded_rules
+        self.rules = rules
 
     def parse_filename(self, filename: str) -> Book:
         """

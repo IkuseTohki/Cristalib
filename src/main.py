@@ -11,6 +11,7 @@ from src.ui.settings_window import SettingsWindow, PasswordDialog
 from src.ui.book_edit_dialog import BookEditDialog
 from src.core.database import DatabaseManager, hash_password, verify_password
 from src.core.scanner import FileScanner
+from src.core.parser import ParsingRuleLoader, FileNameParser # ParsingRuleLoaderとFileNameParserをインポート
 from src.models.book import Book
 
 class ApplicationController:
@@ -18,7 +19,12 @@ class ApplicationController:
     def __init__(self):
         self.db_manager = DatabaseManager()
         self.db_manager.create_tables()
-        self.scanner = FileScanner(self.db_manager)
+
+        # ParsingRuleLoaderとFileNameParserの初期化
+        self.rule_loader = ParsingRuleLoader(rules_path="config/parsing_rules.json")
+        self.parser = FileNameParser(self.rule_loader.load_rules())
+        
+        self.scanner = FileScanner(self.db_manager, self.parser) # scannerにparserを渡す
         self.main_window = MainWindow()
         self.is_private_mode = False # プライベートモードの状態
 
