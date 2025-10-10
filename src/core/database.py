@@ -97,6 +97,11 @@ class DatabaseManager:
             conn.execute("UPDATE books SET file_path = ? WHERE file_hash = ?", (new_path, file_hash))
             conn.commit()
 
+    def update_book_hash(self, old_file_hash: str, new_file_hash: str, new_file_path: str):
+        with self.get_connection() as conn:
+            conn.execute("UPDATE books SET file_hash = ?, file_path = ? WHERE file_hash = ?", (new_file_hash, new_file_path, old_file_hash))
+            conn.commit()
+
     def delete_book(self, file_hash: str):
         with self.get_connection() as conn:
             conn.execute("DELETE FROM books WHERE file_hash = ?", (file_hash,))

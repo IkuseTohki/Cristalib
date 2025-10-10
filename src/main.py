@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*>
 import sys
 import os
 import subprocess
@@ -67,13 +67,15 @@ class ApplicationController:
         scan_folders = self.db_manager.get_scan_folders()
         exclude_folders = self.db_manager.get_exclude_folders()
         viewer_path = self.db_manager.get_setting('viewer_path')
-        settings_dialog.set_settings(scan_folders, exclude_folders, viewer_path)
+        scan_extensions = self.db_manager.get_setting('scan_extensions')
+        settings_dialog.set_settings(scan_folders, exclude_folders, viewer_path, scan_extensions)
 
         if settings_dialog.exec():
-            new_scan, new_exclude, new_viewer = settings_dialog.get_settings()
+            new_scan, new_exclude, new_viewer, new_extensions = settings_dialog.get_settings()
             self.db_manager.save_scan_folders(new_scan)
             self.db_manager.save_exclude_folders(new_exclude)
             self.db_manager.set_setting('viewer_path', new_viewer)
+            self.db_manager.set_setting('scan_extensions', new_extensions)
             print("設定を保存しました。")
 
     def toggle_private_mode(self):

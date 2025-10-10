@@ -57,6 +57,17 @@ class SettingsWindow(QDialog):
         exclude_layout.addLayout(exclude_buttons)
         folder_layout.addLayout(exclude_layout)
 
+        # --- スキャン設定 --- #
+        scan_settings_group = QGroupBox("スキャン設定")
+        scan_settings_layout = QVBoxLayout()
+        scan_settings_group.setLayout(scan_settings_layout)
+        main_layout.addWidget(scan_settings_group)
+
+        scan_settings_layout.addWidget(QLabel("対象拡張子 (カンマ区切り): "))
+        self.scan_extensions_input = QLineEdit()
+        self.scan_extensions_input.setPlaceholderText("例: zip,cbz,rar")
+        scan_settings_layout.addWidget(self.scan_extensions_input)
+
         # --- ビューア設定 --- #
         viewer_group = QGroupBox("ビューア設定")
         viewer_layout = QHBoxLayout()
@@ -114,7 +125,7 @@ class SettingsWindow(QDialog):
         if path:
             self.viewer_path_input.setText(path)
 
-    def set_settings(self, scan_folders: List[Dict], exclude_folders: List[Dict], viewer_path: str):
+    def set_settings(self, scan_folders: List[Dict], exclude_folders: List[Dict], viewer_path: str, scan_extensions: str):
         self.scan_list_model.clear() # モデルをクリア
         for folder in scan_folders:
             item = QStandardItem(folder['path'])
@@ -124,8 +135,9 @@ class SettingsWindow(QDialog):
 
         self.exclude_list_model.setStringList([f['path'] for f in exclude_folders])
         self.viewer_path_input.setText(viewer_path or "")
+        self.scan_extensions_input.setText(scan_extensions or "")
 
-    def get_settings(self) -> Tuple[List[Dict], List[Dict], str]:
+    def get_settings(self) -> Tuple[List[Dict], List[Dict], str, str]:
         scan_folders = []
         for row in range(self.scan_list_model.rowCount()):
             item = self.scan_list_model.item(row)
@@ -136,7 +148,8 @@ class SettingsWindow(QDialog):
 
         exclude_folders = [{'path': path} for path in self.exclude_list_model.stringList()]
         viewer_path = self.viewer_path_input.text()
-        return scan_folders, exclude_folders, viewer_path
+        scan_extensions = self.scan_extensions_input.text()
+        return scan_folders, exclude_folders, viewer_path, scan_extensions
 
 class PasswordDialog(QDialog):
     """パスワード入力ダイアログ。"""
