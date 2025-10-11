@@ -5,7 +5,7 @@
                   アプリケーション設定を行うUIを提供します。
 - PasswordDialog: パスワードの認証や新規設定を行うためのUIを提供します。
 """
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Callable
 from PyQt6.QtCore import QStringListModel, Qt
 from PyQt6.QtWidgets import QDialog, QWidget, QFileDialog, QMessageBox
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
@@ -20,11 +20,12 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
     UIのロジックとPresenterとの連携を担当します。
     UIのレイアウト定義はUi_SettingsWindowクラスに分離されています。
     """
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None, change_password_callback: Optional[Callable] = None):
         """SettingsWindowのコンストラクタ。
 
         Args:
             parent (Optional[QWidget], optional): 親ウィジェット。Defaults to None.
+            change_password_callback (Optional[Callable], optional): パスワード変更ボタンが押されたときに呼び出されるコールバック関数。
         """
         super().__init__(parent)
         self.setupUi(self)
@@ -43,6 +44,9 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         self.browse_viewer_btn.clicked.connect(self.browse_viewer_path)
         self.save_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
+
+        if change_password_callback:
+            self.change_password_btn.clicked.connect(change_password_callback)
 
     def add_scan_folder(self):
         """「スキャン対象フォルダを追加」ボタンのアクション。"""

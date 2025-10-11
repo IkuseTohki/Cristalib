@@ -14,7 +14,8 @@ from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
 from src.ui.settings_window import SettingsWindow, PasswordDialog
 from src.ui.book_edit_dialog import BookEditDialog
-from src.core.database import DatabaseManager, hash_password, verify_password
+from src.core.database import DatabaseManager
+from src.core.security import hash_password, verify_password
 from src.core.scanner import FileScanner
 from src.core.parser import ParsingRuleLoader, FileNameParser
 from src.models.book import Book
@@ -86,7 +87,10 @@ class ApplicationController:
 
     def _open_settings_window_internal(self):
         """認証後に設定ウィンドウを開く内部メソッド。"""
-        settings_dialog = SettingsWindow(self.main_window)
+        settings_dialog = SettingsWindow(
+            parent=self.main_window,
+            change_password_callback=self.change_password
+        )
         scan_folders = self.db_manager.get_scan_folders()
         exclude_folders = self.db_manager.get_exclude_folders()
         viewer_path = self.db_manager.get_setting('viewer_path')
@@ -100,6 +104,36 @@ class ApplicationController:
             self.db_manager.set_setting('viewer_path', new_viewer)
             self.db_manager.set_setting('scan_extensions', new_extensions)
             print("設定を保存しました。")
+
+    def change_password(self):
+        """パスワードの変更処理を行う。"""
+        stored_hash = self.db_manager.get_setting('password_hash')
+        if not stored_hash:
+            # この状況は通常発生しないが念のため
+            QMessageBox.information(self.main_window, "エラー", "パスワードが設定されていません。")
+            return
+
+        # 1. 現在のパスワードを確認
+        auth_dialog = PasswordDialog(self.main_window, mode="authenticate")
+        auth_dialog.setWindowTitle("現在のパスワードを入力")
+        if auth_dialog.exec():
+            entered_password = auth_dialog.get_password()
+            if not verify_password(stored_hash, entered_password):
+                QMessageBox.warning(self.main_window, "認証失敗", "現在のパスワードが正しくありません。")
+                return
+        else:
+            QMessageBox.information(self.main_window, "キャンセル", "パスワード変更がキャンセルされました。")
+            return
+
+        # 2. 新しいパスワードを設定
+        set_password_dialog = PasswordDialog(self.main_window, mode="set_password")
+        if set_password_dialog.exec():
+            new_password = set_password_dialog.get_password()
+            if new_password:
+                self.db_manager.set_setting('password_hash', hash_password(new_password))
+                QMessageBox.information(self.main_window, "成功", "パスワードが変更されました。")
+        else:
+            QMessageBox.information(self.main_window, "キャンセル", "パスワード変更がキャンセルされました。")
 
     def toggle_private_mode(self):
         """プライベートモードのオン/オフを切り替える。
@@ -150,17 +184,9 @@ class ApplicationController:
 
     def open_book_edit_dialog(self):
         """選択された書籍のメタデータを編集するダイアログを開く。"""
-        selected_indexes = self.main_window.book_table_view.selectedIndexes()
-        if not selected_indexes:
-            QMessageBox.information(self.main_window, "情報", "編集する書籍を選択してください。")
-            return
-
-        proxy_index = selected_indexes[0]
-        source_index = self.main_window.proxy_model.mapToSource(proxy_index)
-        book: Book = self.main_window.book_table_model.itemFromIndex(source_index).data(Qt.ItemDataRole.UserRole)
-
+        book = self.main_window.get_selected_book()
         if not book:
-            QMessageBox.warning(self.main_window, "エラー", "選択された書籍情報が見つかりません。")
+            QMessageBox.information(self.main_window, "情報", "編集する書籍を選択してください。")
             return
 
         edit_dialog = BookEditDialog(self.main_window, book=book)
