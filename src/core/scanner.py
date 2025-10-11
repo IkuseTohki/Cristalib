@@ -55,7 +55,7 @@ class FileScanner:
         以下の処理を実行します。
         1. ファイルシステムから対象拡張子のファイル一覧を取得します。
         2. データベースから登録済みの書籍情報を取得します。
-        3. 両者を比較し、差分（新規、削除、移動）を検出してデータベースに反映します。
+        3. 両者を比較し、差分（新規、削除、更新、移動）を検出してデータベースに反映します。
         """
         print("スキャン処理を開始します...")
         scan_folders = self.db_manager.get_scan_folders()
@@ -68,14 +68,14 @@ class FileScanner:
             target_extensions = {ext.strip().lower() for ext in scan_extensions_str.split(',') if ext.strip()}
 
         # 1. ファイルシステム上の全ファイルをスキャン
-        found_files: Dict[str, str] = {}
+        found_files_by_hash: Dict[str, str] = {}
+        found_files_by_path: Dict[str, str] = {}
         for folder in scan_folders:
             scan_path = folder['path']
             for root, _, files in os.walk(scan_path):
                 if any(root.startswith(excluded) for excluded in exclude_paths):
                     continue
                 for file in files:
-                    # 拡張子フィルタリング
                     file_ext = os.path.splitext(file)[1].lstrip('.').lower()
                     if target_extensions and file_ext not in target_extensions:
                         continue
@@ -83,27 +83,48 @@ class FileScanner:
                     file_path = os.path.join(root, file)
                     file_hash = self._calculate_hash(file_path)
                     if file_hash:
-                        found_files[file_hash] = file_path
+                        found_files_by_hash[file_hash] = file_path
+                        found_files_by_path[file_path] = file_hash
 
         # 2. データベース上の全書籍情報を取得
-        db_books: Dict[str, Book] = {book.file_hash: book for book in self.db_manager.get_all_books()}
-
-        found_hashes = set(found_files.keys())
-        db_hashes = set(db_books.keys())
+        db_books = self.db_manager.get_all_books()
+        db_books_by_hash: Dict[str, Book] = {book.file_hash: book for book in db_books}
+        db_books_by_path: Dict[str, Book] = {book.file_path: book for book in db_books}
 
         # 3. 差分を検出して処理
+        
+        # 3.1. 更新されたファイルを先に処理 (パスが同じでハッシュが異なる)
+        updated_paths = {p for p in db_books_by_path if p in found_files_by_path and found_files_by_path[p] != db_books_by_path[p].file_hash}
+        for path in updated_paths:
+            old_book = db_books_by_path[path]
+            new_hash = found_files_by_path[path]
+            
+            print(f"更新: {old_book.title} ({path})")
+            self.db_manager.update_book_hash(old_book.file_hash, new_hash, path)
+            
+            # 更新済みのものは後続の差分検出から除外
+            if old_book.file_hash in db_books_by_hash:
+                del db_books_by_hash[old_book.file_hash]
+            if new_hash in found_files_by_hash:
+                del found_files_by_hash[new_hash]
+
+        # 3.2. 残りのファイルで新規、移動、削除を検出
+        found_hashes = set(found_files_by_hash.keys())
+        db_hashes = set(db_books_by_hash.keys())
+
         new_hashes = found_hashes - db_hashes
         deleted_hashes = db_hashes - found_hashes
+        moved_hashes = found_hashes.intersection(db_hashes)
 
-        # 既存ファイルのパス更新チェック (ハッシュは同じだがパスが異なる場合)
-        for h in found_hashes.intersection(db_hashes):
-            if found_files[h] != db_books[h].file_path:
-                self.db_manager.update_book_path(h, found_files[h])
-                print(f"パス更新: {db_books[h].title} -> {found_files[h]}")
+        # 3.2.1. 移動 (ハッシュは同じだがパスが異なる)
+        for h in moved_hashes:
+            if found_files_by_hash[h] != db_books_by_hash[h].file_path:
+                self.db_manager.update_book_path(h, found_files_by_hash[h])
+                print(f"パス更新: {db_books_by_hash[h].title} -> {found_files_by_hash[h]}")
 
-        # 新規ファイル
+        # 3.2.2. 新規
         for h in new_hashes:
-            path = found_files[h]
+            path = found_files_by_hash[h]
             book_info = self.parser.parse_filename(os.path.basename(path))
             book_info.file_path = path
             book_info.file_hash = h
@@ -111,9 +132,9 @@ class FileScanner:
             self.db_manager.save_book(book_info)
             print(f"新規登録: {book_info.title} ({path})")
 
-        # 削除されたファイル
+        # 3.2.3. 削除
         for h in deleted_hashes:
             self.db_manager.delete_book(h)
-            print(f"削除: {db_books[h].title} ({db_books[h].file_path})")
+            print(f"削除: {db_books_by_hash[h].title} ({db_books_by_hash[h].file_path})")
 
         print("スキャン処理が完了しました。")
