@@ -6,6 +6,7 @@
 """
 import hashlib
 import secrets
+from typing import Optional
 
 def hash_password(password: str) -> str:
     """パスワードをソルト付きのSHA256でハッシュ化する。
@@ -21,18 +22,18 @@ def hash_password(password: str) -> str:
     return f"{salt}:{hashed_password}"
 
 
-def verify_password(stored_password_hash: str, provided_password: str) -> bool:
+def verify_password(stored_password_hash: str, provided_password: Optional[str]) -> bool:
     """提供されたパスワードが保存されたハッシュと一致するか検証する。
 
     Args:
         stored_password_hash (str): データベースに保存されている "ソルト:ハッシュ値" 形式の文字列。
-        provided_password (str): ユーザーが入力した平文のパスワード。
+        provided_password (Optional[str]): ユーザーが入力した平文のパスワード。
 
     Returns:
         bool: パスワードが一致すればTrue、そうでなければFalse。
     """
-    if not stored_password_hash or ':' not in stored_password_hash:
-        return False  # ハッシュ形式が不正
+    if not stored_password_hash or not provided_password or ':' not in stored_password_hash:
+        return False
     salt, stored_hash = stored_password_hash.split(':')
     provided_hashed_password = hashlib.sha256((provided_password + salt).encode('utf-8')).hexdigest()
     return secrets.compare_digest(stored_hash, provided_hashed_password)
