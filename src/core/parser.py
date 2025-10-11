@@ -1,25 +1,41 @@
 # -*- coding: utf-8 -*-
+"""ファイル名の解析に関連するクラスを定義します。
+
+- ParsingRuleLoader: JSONファイルから解析ルールを読み込みます。
+- FileNameParser: 読み込まれたルールに基づき、ファイル名から書籍情報を抽出します。
+"""
 import json
 import re
 import os
 from typing import List, Dict
 from src.models.book import Book
 
+
 class ParsingRuleLoader:
+    """ファイル名解析ルールをJSONファイルから読み込むクラス。
+
+    Attributes:
+        rules_path (str): 解析ルールが記述されたJSONファイルのパス。
     """
-    ファイル名解析ルールをJSONファイルから読み込むクラス。
-    """
+
     def __init__(self, rules_path: str):
+        """ParsingRuleLoaderのコンストラクタ。
+
+        Args:
+            rules_path (str): 解析ルールが記述されたJSONファイルのパス。
+        """
         self.rules_path = rules_path
 
     def load_rules(self) -> List[Dict]:
-        """
-        解析ルールをJSONファイルから読み込み、優先度順にソートして返す。
+        """解析ルールをJSONファイルから読み込み、優先度順にソートして返す。
+
+        ファイルが存在しない場合は、ハードコードされたデフォルトのルールを返します。
+
+        Returns:
+            List[Dict]: 優先度（priority）でソートされた解析ルールのリスト。
         """
         if not os.path.exists(self.rules_path):
-            # ファイルが存在しない場合は空のルールリストを返す
-            # またはデフォルトのハードコードされたルールを返す
-            # 現状はハードコードされたルールを返すことで、ファイルがない場合でも動作を保証
+            # ファイルが存在しない場合はハードコードされたルールを返す
             hardcoded_rules = [
               {
                 "name": "[著者] タイトル 第N巻 (雑誌版対応)",
@@ -34,30 +50,40 @@ class ParsingRuleLoader:
             ]
             hardcoded_rules.sort(key=lambda x: x.get('priority', 999))
             return hardcoded_rules
-        
+
         with open(self.rules_path, 'r', encoding='utf-8') as f:
             rules = json.load(f)
-        
+
         rules.sort(key=lambda x: x.get('priority', 999))
         return rules
 
+
 class FileNameParser:
+    """ファイル名から書籍情報を解析するクラス。
+
+    Attributes:
+        rules (List[Dict]): 解析に使用するルールのリスト。
     """
-    ファイル名から書籍情報を解析するクラス。
-    """
+
     def __init__(self, rules: List[Dict]):
-        """
-        コンストラクタ。読み込まれた解析ルールを受け取る。
-        :param rules: 読み込まれ、ソート済みの解析ルールリスト。
+        """FileNameParserのコンストラクタ。
+
+        Args:
+            rules (List[Dict]): 読み込まれ、ソート済みの解析ルールリスト。
         """
         self.rules = rules
 
     def parse_filename(self, filename: str) -> Book:
-        """
-        ファイル名（拡張子なし）を受け取り、解析ルールに基づいて書籍情報を抽出する。
-        
-        :param filename: 解析対象のファイル名（拡張子なし）。
-        :return: 抽出された情報を持つBookオブジェクト。
+        """ファイル名を受け取り、解析ルールに基づいて書籍情報を抽出する。
+
+        ファイル名は拡張子が含まれていても処理されます。
+        どのルールにもマッチしない場合は、拡張子を除いたファイル名をタイトルとして返します。
+
+        Args:
+            filename (str): 解析対象のファイル名。
+
+        Returns:
+            Book: 抽出された情報を持つBookオブジェクト。
         """
         base_filename = os.path.splitext(filename)[0]
 
@@ -65,7 +91,7 @@ class FileNameParser:
             match = re.search(rule['regex'], base_filename)
             if match:
                 data = match.groupdict()
-                
+
                 is_magazine = 'magazine_flag' in data and data['magazine_flag'] is not None
 
                 return Book(

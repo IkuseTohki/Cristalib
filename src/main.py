@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*>
+"""アプリケーションのエントリーポイントとメインコントローラー。
+
+ApplicationControllerクラスが、UI、データベース、ファイルスキャナー間の
+やり取りを制御し、アプリケーション全体の動作を管理します。
+"""
 import sys
 import os
 import subprocess
@@ -11,22 +16,33 @@ from src.ui.settings_window import SettingsWindow, PasswordDialog
 from src.ui.book_edit_dialog import BookEditDialog
 from src.core.database import DatabaseManager, hash_password, verify_password
 from src.core.scanner import FileScanner
-from src.core.parser import ParsingRuleLoader, FileNameParser # ParsingRuleLoaderとFileNameParserをインポート
+from src.core.parser import ParsingRuleLoader, FileNameParser
 from src.models.book import Book
 
+
 class ApplicationController:
-    """アプリケーション全体のロジックを管理するコントローラー。"""
+    """アプリケーション全体のロジックを管理するコントローラー。
+
+    Attributes:
+        db_manager (DatabaseManager): データベース管理オブジェクト。
+        rule_loader (ParsingRuleLoader): 解析ルール読み込みオブジェクト。
+        parser (FileNameParser): ファイル名解析オブジェクト。
+        scanner (FileScanner): ファイルスキャンオブジェクト。
+        main_window (MainWindow): メインウィンドウのUIオブジェクト。
+        is_private_mode (bool): プライベートモードが有効かどうかの状態。
+    """
+
     def __init__(self):
+        """ApplicationControllerのコンストラクタ。"""
         self.db_manager = DatabaseManager()
         self.db_manager.create_tables()
 
-        # ParsingRuleLoaderとFileNameParserの初期化
         self.rule_loader = ParsingRuleLoader(rules_path="config/parsing_rules.json")
         self.parser = FileNameParser(self.rule_loader.load_rules())
         
-        self.scanner = FileScanner(self.db_manager, self.parser) # scannerにparserを渡す
+        self.scanner = FileScanner(self.db_manager, self.parser)
         self.main_window = MainWindow()
-        self.is_private_mode = False # プライベートモードの状態
+        self.is_private_mode = False
 
         self.connect_signals()
 
@@ -40,11 +56,13 @@ class ApplicationController:
         self.main_window.edit_button.clicked.connect(self.open_book_edit_dialog)
 
     def authenticate_and_open_settings(self):
-        """パスワード認証後、設定ウィンドウを開く。"""
+        """パスワード認証を行い、成功すれば設定ウィンドウを開く。
+
+        パスワードが未設定の場合は、設定を促すダイアログを表示する。
+        """
         stored_hash = self.db_manager.get_setting('password_hash')
 
         if not stored_hash:
-            # パスワードが未設定の場合
             QMessageBox.information(self.main_window, "パスワード設定", "初回起動です。パスワードを設定してください。")
             set_password_dialog = PasswordDialog(self.main_window, mode="set_password")
             if set_password_dialog.exec():
@@ -52,11 +70,10 @@ class ApplicationController:
                 if new_password:
                     self.db_manager.set_setting('password_hash', hash_password(new_password))
                     QMessageBox.information(self.main_window, "成功", "パスワードが設定されました。")
-                    self._open_settings_window_internal() # 設定後、設定画面を開く
+                    self._open_settings_window_internal()
             else:
                 QMessageBox.warning(self.main_window, "キャンセル", "パスワード設定がキャンセルされました。")
         else:
-            # パスワードが設定済みの場合
             auth_dialog = PasswordDialog(self.main_window, mode="authenticate")
             if auth_dialog.exec():
                 entered_password = auth_dialog.get_password()
@@ -85,14 +102,15 @@ class ApplicationController:
             print("設定を保存しました。")
 
     def toggle_private_mode(self):
-        """プライベートモードの切り替え。"""
+        """プライベートモードのオン/オフを切り替える。
+
+        プライベートモードへ移行する際にはパスワード認証を要求する。
+        """
         if self.is_private_mode:
-            # プライベートモードから通常モードへ
             self.is_private_mode = False
             self.main_window.mode_button.setText("プライベートモードへ")
-            self.load_books_to_list() # リストを更新
+            self.load_books_to_list()
         else:
-            # 通常モードからプライベートモードへ (認証が必要)
             stored_hash = self.db_manager.get_setting('password_hash')
             if not stored_hash:
                 QMessageBox.information(self.main_window, "パスワード未設定", "プライベートモードを使用するには、まず設定画面でパスワードを設定してください。")
@@ -104,14 +122,14 @@ class ApplicationController:
                 if verify_password(stored_hash, entered_password):
                     self.is_private_mode = True
                     self.main_window.mode_button.setText("通常モードへ")
-                    self.load_books_to_list() # リストを更新
+                    self.load_books_to_list()
                 else:
                     QMessageBox.warning(self.main_window, "認証失敗", "パスワードが正しくありません。")
             else:
                 QMessageBox.information(self.main_window, "キャンセル", "認証がキャンセルされました。")
 
     def open_selected_book_in_viewer(self):
-        """テーブルで選択されている書籍をビューアで開く。"""
+        """テーブルで選択されている書籍を外部ビューアで開く。"""
         selected_indexes = self.main_window.book_table_view.selectedIndexes()
         if not selected_indexes:
             return
@@ -124,25 +142,12 @@ class ApplicationController:
             QMessageBox.warning(self.main_window, "エラー", "選択された蔵書情報が見つかりません。")
             return
 
-        # まずビューアパスの状況をチェック
         viewer_path = self.db_manager.get_setting('viewer_path')
-        if not viewer_path:
-            QMessageBox.information(self.main_window, "ビューア未設定",
-                "ビューアが設定されていません。\n設定画面から使用するビューアのパスを指定してください。")
-            return
-        
-        # ビューアパスが存在するかチェック
-        if not os.path.exists(viewer_path):
-            QMessageBox.warning(self.main_window, "ビューアが見つかりません",
-                f"設定されたビューアが見つかりません。\nパス: {viewer_path}\n設定画面でパスを確認してください。")
+        if not viewer_path or not os.path.exists(viewer_path):
+            QMessageBox.information(self.main_window, "ビューア未設定", "ビューアが設定されていないか、パスが無効です。設定画面で指定してください。")
             return
 
-        # 次に蔵書ファイルパスの状況をチェック
-        if not book.file_path:
-            QMessageBox.warning(self.main_window, "エラー", "選択された蔵書にファイルパスが登録されていません。")
-            return
-
-        if not os.path.exists(book.file_path):
+        if not book.file_path or not os.path.exists(book.file_path):
             QMessageBox.warning(self.main_window, "エラー", f"蔵書ファイルが見つかりません。\nパス: {book.file_path}")
             return
 
@@ -152,7 +157,7 @@ class ApplicationController:
             QMessageBox.critical(self.main_window, "起動エラー", f"ビューアを起動できませんでした。\n{e}")
 
     def open_book_edit_dialog(self):
-        """選択された書籍の編集ダイアログを開く。"""
+        """選択された書籍のメタデータを編集するダイアログを開く。"""
         selected_indexes = self.main_window.book_table_view.selectedIndexes()
         if not selected_indexes:
             QMessageBox.information(self.main_window, "情報", "編集する書籍を選択してください。")
@@ -169,67 +174,42 @@ class ApplicationController:
         edit_dialog = BookEditDialog(self.main_window, book=book)
         if edit_dialog.exec():
             updated_book = edit_dialog.get_book_data()
-            # 元の書籍のfile_path, file_hash, created_at は編集しないので引き継ぐ
-            updated_book.file_path = book.file_path
-            updated_book.file_hash = book.file_hash
-            updated_book.created_at = book.created_at
-            
             self.db_manager.update_book(updated_book)
-            self.load_books_to_list() # リストを更新
+            self.load_books_to_list()
             QMessageBox.information(self.main_window, "成功", "書籍情報を更新しました。")
 
     def run_scan_and_refresh(self):
+        """ファイルスキャンを実行し、UIを更新する。"""
         self.scanner.scan_folders()
         self.load_books_to_list()
 
     def load_books_to_list(self):
-        """データベースから書籍を読み込み、UIに表示する。"""
+        """データベースから書籍を読み込み、UIテーブルに表示する。
+        
+        プライベートモードの状態に応じて、表示する書籍をフィルタリングする。
+        """
         all_books = self.db_manager.get_all_books()
+        books_to_display = all_books
 
-        if self.is_private_mode:
-            books_to_display = all_books
-        else:
+        if not self.is_private_mode:
             scan_folders_data = self.db_manager.get_scan_folders()
+            private_paths = {f['path'] for f in scan_folders_data if f.get('is_private', 0)}
             
-            scan_folder_private_status = {f['path']: f.get('is_private', 0) for f in scan_folders_data}
+            # 正規化して比較
+            normalized_private_paths = {os.path.normpath(p) for p in private_paths}
 
-            books_to_display = []
-            for book in all_books:
-                if not book.file_path:
-                    continue
-
-                book_dir = os.path.dirname(book.file_path)
-                book_dir = book_dir.replace("\\", "/")
-                
-                is_private_for_book = 1 # デフォルトはプライベート扱い
-                
-                matched_scan_root = None
-                for scan_root_path in scan_folder_private_status.keys():
-                    normalized_scan_root_path = scan_root_path.replace("\\", "/")
-                    
-                    common_path_result = os.path.commonpath([normalized_scan_root_path, book_dir])
-                    normalized_common_path_result = common_path_result.replace("\\", "/")
-
-                    if normalized_common_path_result == normalized_scan_root_path:
-                        if matched_scan_root is None or len(normalized_scan_root_path) > len(matched_scan_root):
-                            matched_scan_root = normalized_scan_root_path
-                
-                if matched_scan_root:
-                    is_private_for_book = scan_folder_private_status[matched_scan_root]
-                
-                if is_private_for_book == 0: # is_privateが0なら通常モードで表示
-                    books_to_display.append(book)
+            books_to_display = [b for b in all_books if not any(os.path.normpath(b.file_path).startswith(p) for p in normalized_private_paths)]
 
         self.main_window.display_books(books_to_display)
-        self.load_column_settings() # 列設定をロード
+        self.load_column_settings()
 
     def run(self):
-        """アプリケーションを実行する。"""
+        """アプリケーションのメインループを開始する。"""
         self.main_window.show()
         self.load_books_to_list()
 
     def load_column_settings(self):
-        """保存された列の表示状態と幅を読み込み、適用する。"""
+        """保存された列の表示状態と幅を読み込み、テーブルに適用する。"""
         visibility_json = self.db_manager.get_setting('column_visibility')
         widths_json = self.db_manager.get_setting('column_widths')
         
@@ -238,41 +218,38 @@ class ApplicationController:
             try:
                 settings['visibility'] = json.loads(visibility_json)
             except json.JSONDecodeError:
-                print("Warning: Failed to decode column visibility settings.")
+                pass # エラーでも続行
         if widths_json:
             try:
                 settings['widths'] = json.loads(widths_json)
             except json.JSONDecodeError:
-                print("Warning: Failed to decode column widths settings.")
+                pass # エラーでも続行
         
         if settings:
             self.main_window.apply_column_settings(settings)
 
     def save_column_settings(self):
-        """現在の列の表示状態と幅を保存する。"""
+        """現在のテーブルの列の表示状態と幅をデータベースに保存する。"""
         settings = self.main_window.get_column_settings()
-        
         visibility_json = json.dumps(settings['visibility'])
         widths_json = json.dumps(settings['widths'])
         
         self.db_manager.set_setting('column_visibility', visibility_json)
         self.db_manager.set_setting('column_widths', widths_json)
-        print("Column settings saved.")
 
 def main():
-    """アプリケーションのメインエントリポイント。"""
+    """アプリケーションのメインエントリーポイント。
+
+    QApplicationを作成し、コントローラーを初期化してアプリケーションを実行します。
+    終了時に設定を保存する処理も接続します。
+    """
     app = QApplication(sys.argv)
-    # アプリケーション終了時に設定を保存するシグナルを接続
-    app.aboutToQuit.connect(lambda: controller.save_column_settings())
-
-    # フォント設定
-    font = QFont("Yu Gothic UI", 12) # Windows環境を想定し、Yu Gothic UIを優先
-    font.setStyleHint(QFont.StyleHint.System) # システムのフォントヒントを使用
+    font = QFont("Yu Gothic UI", 12)
+    font.setStyleHint(QFont.StyleHint.System)
     app.setFont(font)
+    
     controller = ApplicationController()
-
-    # アプリケーション終了時に設定を保存するシグナルを接続
-    app.aboutToQuit.connect(lambda: controller.save_column_settings())
+    app.aboutToQuit.connect(controller.save_column_settings)
 
     controller.run()
     sys.exit(app.exec())

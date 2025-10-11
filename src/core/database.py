@@ -1,30 +1,63 @@
 # -*- coding: utf-8 -*-
+"""データベースの管理と操作を行うモジュール。
+
+SQLiteデータベースへの接続、テーブル作成、CRUD操作、設定管理などを担当する
+DatabaseManagerクラスと、パスワードハッシュ化のヘルパー関数を提供します。
+"""
 import sqlite3
 import os
 import hashlib
 import secrets
 from contextlib import contextmanager
-from typing import List, Optional
+from typing import List, Optional, Generator, Any, Dict
 from src.models.book import Book
 
-# --- パスワードハッシュ化ヘルパー関数 ---
+
 def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16) # 16バイトのランダムなソルトを生成
+    """パスワードをソルト付きのSHA256でハッシュ化する。
+
+    Args:
+        password (str): ハッシュ化する平文のパスワード。
+
+    Returns:
+        str: "ソルト:ハッシュ値" の形式の文字列。
+    """
+    salt = secrets.token_hex(16)
     hashed_password = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
     return f"{salt}:{hashed_password}"
 
+
 def verify_password(stored_password_hash: str, provided_password: str) -> bool:
+    """提供されたパスワードが保存されたハッシュと一致するか検証する。
+
+    Args:
+        stored_password_hash (str): データベースに保存されている "ソルト:ハッシュ値" 形式の文字列。
+        provided_password (str): ユーザーが入力した平文のパスワード。
+
+    Returns:
+        bool: パスワードが一致すればTrue、そうでなければFalse。
+    """
     if not stored_password_hash or ':' not in stored_password_hash:
-        return False # ハッシュ形式が不正
+        return False  # ハッシュ形式が不正
     salt, stored_hash = stored_password_hash.split(':')
     provided_hashed_password = hashlib.sha256((provided_password + salt).encode('utf-8')).hexdigest()
     return secrets.compare_digest(stored_hash, provided_hashed_password)
 
+
 class DatabaseManager:
+    """データベースの接続、操作、管理を行うクラス。
+
+    Attributes:
+        db_path (str): データベースファイルのパス。
     """
-    データベースの接続、操作、管理を行うクラス。
-    """
-    def __init__(self, db_path="data/library.db"):
+
+    def __init__(self, db_path: str = "data/library.db"):
+        """DatabaseManagerのコンストラクタ。
+
+        Args:
+            db_path (str, optional): データベースファイルのパス。
+                                     Defaults to "data/library.db".
+        """
         self.db_path = db_path
         self._ensure_db_directory()
 
@@ -35,8 +68,12 @@ class DatabaseManager:
             os.makedirs(db_dir)
 
     @contextmanager
-    def get_connection(self):
-        """データベース接続を管理するコンテキストマネージャ。"""
+    def get_connection(self) -> Generator[sqlite3.Connection, Any, None]:
+        """データベース接続を管理するコンテキストマネージャ。
+
+        Yields:
+            sqlite3.Connection: データベース接続オブジェクト。
+        """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
@@ -48,7 +85,6 @@ class DatabaseManager:
         """データベース内に必要なテーブルをすべて作成する。"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # books, scan_folders, exclude_folders, app_settings テーブルを作成
             cursor.execute(
                 '''CREATE TABLE IF NOT EXISTS books (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, subtitle TEXT, 
@@ -74,6 +110,11 @@ class DatabaseManager:
 
     # --- Book --- #
     def save_book(self, book: Book):
+        """新しい書籍情報をデータベースに保存する。
+
+        Args:
+            book (Book): 保存する書籍情報を持つBookオブジェクト。
+        """
         with self.get_connection() as conn:
             conn.execute(
                 "INSERT INTO books (title, subtitle, volume, author, original_author, series, category, rating, is_magazine_collection, file_path, file_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -82,32 +123,68 @@ class DatabaseManager:
             conn.commit()
 
     def get_book_by_hash(self, file_hash: str) -> Optional[Book]:
+        """ファイルハッシュを基に書籍情報を取得する。
+
+        Args:
+            file_hash (str): 検索するファイルのハッシュ値。
+
+        Returns:
+            Optional[Book]: 見つかった書籍のBookオブジェクト。見つからなければNone。
+        """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM books WHERE file_hash = ?", (file_hash,))
             row = cursor.fetchone()
             return Book(**row) if row else None
 
     def get_all_books(self) -> List[Book]:
+        """データベース上のすべての書籍情報を取得する。
+
+        Returns:
+            List[Book]: すべての書籍情報を含むBookオブジェクトのリスト。
+        """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM books")
             return [Book(**row) for row in cursor.fetchall()]
 
     def update_book_path(self, file_hash: str, new_path: str):
+        """書籍のファイルパスを更新する。
+
+        Args:
+            file_hash (str): 対象書籍のファイルハッシュ。
+            new_path (str): 新しいファイルパス。
+        """
         with self.get_connection() as conn:
             conn.execute("UPDATE books SET file_path = ? WHERE file_hash = ?", (new_path, file_hash))
             conn.commit()
 
     def update_book_hash(self, old_file_hash: str, new_file_hash: str, new_file_path: str):
+        """書籍のファイルハッシュとパスを更新する（ファイル内容が変更された場合など）。
+
+        Args:
+            old_file_hash (str): 更新前のファイルハッシュ。
+            new_file_hash (str): 更新後の新しいファイルハッシュ。
+            new_file_path (str): 更新後の新しいファイルパス。
+        """
         with self.get_connection() as conn:
             conn.execute("UPDATE books SET file_hash = ?, file_path = ? WHERE file_hash = ?", (new_file_hash, new_file_path, old_file_hash))
             conn.commit()
 
     def delete_book(self, file_hash: str):
+        """ファイルハッシュを基に書籍情報を削除する。
+
+        Args:
+            file_hash (str): 削除する書籍のファイルハッシュ。
+        """
         with self.get_connection() as conn:
             conn.execute("DELETE FROM books WHERE file_hash = ?", (file_hash,))
             conn.commit()
 
     def update_book(self, book: Book):
+        """既存の書籍情報を更新する。
+
+        Args:
+            book (Book): 更新する情報を持つBookオブジェクト。IDで対象を特定する。
+        """
         with self.get_connection() as conn:
             conn.execute(
                 "UPDATE books SET title=?, subtitle=?, volume=?, author=?, original_author=?, series=?, category=?, rating=?, is_magazine_collection=? WHERE id=?",
@@ -116,12 +193,22 @@ class DatabaseManager:
             conn.commit()
 
     # --- ScanFolder --- #
-    def get_scan_folders(self) -> List[dict]:
+    def get_scan_folders(self) -> List[Dict[str, Any]]:
+        """スキャン対象フォルダのリストを取得する。
+
+        Returns:
+            List[Dict[str, Any]]: スキャン対象フォルダの辞書のリスト。
+        """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM scan_folders")
             return [dict(row) for row in cursor.fetchall()]
 
-    def save_scan_folders(self, folders: List[dict]):
+    def save_scan_folders(self, folders: List[Dict[str, Any]]):
+        """スキャン対象フォルダのリストを保存する（全件洗い替え）。
+
+        Args:
+            folders (List[Dict[str, Any]]): 保存するスキャン対象フォルダの辞書のリスト。
+        """
         with self.get_connection() as conn:
             conn.execute("DELETE FROM scan_folders")
             conn.executemany(
@@ -131,12 +218,22 @@ class DatabaseManager:
             conn.commit()
 
     # --- ExcludeFolder --- #
-    def get_exclude_folders(self) -> List[dict]:
+    def get_exclude_folders(self) -> List[Dict[str, Any]]:
+        """除外対象フォルダのリストを取得する。
+
+        Returns:
+            List[Dict[str, Any]]: 除外対象フォルダの辞書のリスト。
+        """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM exclude_folders")
             return [dict(row) for row in cursor.fetchall()]
 
-    def save_exclude_folders(self, folders: List[dict]):
+    def save_exclude_folders(self, folders: List[Dict[str, Any]]):
+        """除外対象フォルダのリストを保存する（全件洗い替え）。
+
+        Args:
+            folders (List[Dict[str, Any]]): 保存する除外対象フォルダの辞書のリスト。
+        """
         with self.get_connection() as conn:
             conn.execute("DELETE FROM exclude_folders")
             conn.executemany(
@@ -147,12 +244,26 @@ class DatabaseManager:
 
     # --- AppSettings --- #
     def get_setting(self, key: str) -> Optional[str]:
+        """アプリケーション設定をキーで取得する。
+
+        Args:
+            key (str): 取得する設定のキー。
+
+        Returns:
+            Optional[str]: 設定値。キーが存在しない場合はNone。
+        """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,))
             row = cursor.fetchone()
             return row['value'] if row else None
 
     def set_setting(self, key: str, value: str):
+        """アプリケーション設定をキーと値で保存または更新する。
+
+        Args:
+            key (str): 設定のキー。
+            value (str): 設定の値。
+        """
         with self.get_connection() as conn:
             conn.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
