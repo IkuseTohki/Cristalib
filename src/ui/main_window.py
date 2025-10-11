@@ -1,20 +1,16 @@
 # -*- coding: utf-8 -*-
 """アプリケーションのメインウィンドウUIを定義します。
 
-MainWindowクラスがUIの骨格をなし、書籍一覧の表示、検索、
-各種操作ボタンの配置などを行います。
-BookFilterProxyModelクラスは、検索機能のためのフィルタリングロジックを提供します。
+MainWindowクラスはUIのロジックとPresenterとの連携を担当します。
+UIのレイアウト定義はUi_MainWindowクラスに分離されています。
 """
-import sys
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 from PyQt6.QtCore import QSortFilterProxyModel, Qt
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLineEdit, QTableView, QLabel, QAbstractItemView, QMenuBar, QMenu
-)
+from PyQt6.QtWidgets import QMainWindow, QWidget
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from src.models.book import Book
+from .base.ui_main_window import Ui_MainWindow
 
 
 class BookFilterProxyModel(QSortFilterProxyModel):
@@ -50,63 +46,26 @@ class BookFilterProxyModel(QSortFilterProxyModel):
         return False
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, Ui_MainWindow):
     """アプリケーションのメインウィンドウ。
 
-    UIウィジェットの配置、モデルとビューの接続、表示の更新などを担当します。
+    UIのロジックとPresenterとの連携を担当します。
+    UIのレイアウト定義はUi_MainWindowクラスに分離されています。
     """
-    def __init__(self):
+    def __init__(self, parent: Optional[QWidget] = None):
         """MainWindowのコンストラクタ。"""
-        super().__init__()
-        self.setWindowTitle("Cristalib")
-        self.setGeometry(100, 100, 1200, 800)
+        super().__init__(parent)
+        self.setupUi(self) # UI定義からUIを構築
 
+        # --- モデルのセットアップ ---
         self.book_table_model = QStandardItemModel()
         self.proxy_model = BookFilterProxyModel()
         self.proxy_model.setSourceModel(self.book_table_model)
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-
-        self.setup_ui()
-
-        self.search_input.textChanged.connect(self.proxy_model.setFilterRegularExpression)
-
-    def setup_ui(self):
-        """UIウィジェットの初期化とレイアウト設定を行う。"""
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-
-        self.menu_bar = self.menuBar()
-        self.view_menu = self.menu_bar.addMenu("表示")
-
-        header_layout = QHBoxLayout()
-        self.mode_button = QPushButton("プライベートモードへ")
-        self.settings_button = QPushButton("設定")
-        header_layout.addWidget(QLabel("蔵書管理"))
-        header_layout.addStretch()
-        header_layout.addWidget(self.mode_button)
-        header_layout.addWidget(self.settings_button)
-        main_layout.addLayout(header_layout)
-
-        search_layout = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("検索...")
-        self.sync_button = QPushButton("同期")
-        self.edit_button = QPushButton("編集")
-        self.viewer_button = QPushButton("ビューアで開く")
-        search_layout.addWidget(self.search_input)
-        search_layout.addWidget(self.sync_button)
-        search_layout.addWidget(self.edit_button)
-        search_layout.addWidget(self.viewer_button)
-        main_layout.addLayout(search_layout)
-
-        self.book_table_view = QTableView()
         self.book_table_view.setModel(self.proxy_model)
-        self.book_table_view.setSortingEnabled(True)
-        self.book_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.book_table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.book_table_view.horizontalHeader().setStretchLastSection(True)
-        main_layout.addWidget(self.book_table_view)
+
+        # --- シグナルの接続 ---
+        self.search_input.textChanged.connect(self.proxy_model.setFilterRegularExpression)
 
     def display_books(self, books: List[Book]):
         """書籍のリストをテーブルビューに表示する。
@@ -178,3 +137,32 @@ class MainWindow(QMainWindow):
                 if i < self.book_table_model.columnCount():
                     self.book_table_view.setColumnWidth(i, width)
         self.update_column_visibility_menu()
+
+    def update_private_mode_view(self, is_private: bool):
+        """プライベートモードの状態に応じてUIの表示を更新する。
+
+        Args:
+            is_private (bool): プライベートモードが有効な場合はTrue。
+        """
+        if is_private:
+            self.mode_button.setText("通常モードへ")
+        else:
+            self.mode_button.setText("プライベートモードへ")
+
+    def get_selected_book(self) -> Optional[Book]:
+        """テーブルビューで現在選択されている行のBookオブジェクトを取得する。
+
+        Returns:
+            Optional[Book]: 選択されている行のBookオブジェクト。何も選択されていない場合はNone。
+        """
+        selected_indexes = self.book_table_view.selectedIndexes()
+        if not selected_indexes:
+            return None
+
+        proxy_index = selected_indexes[0]
+        source_index = self.proxy_model.mapToSource(proxy_index)
+        item = self.book_table_model.itemFromIndex(source_index)
+        if not item:
+            return None
+        
+        return item.data(Qt.ItemDataRole.UserRole)

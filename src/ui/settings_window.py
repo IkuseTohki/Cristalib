@@ -5,21 +5,20 @@
                   アプリケーション設定を行うUIを提供します。
 - PasswordDialog: パスワードの認証や新規設定を行うためのUIを提供します。
 """
-import sys
 from typing import List, Dict, Tuple, Optional
 from PyQt6.QtCore import QStringListModel, Qt
-from PyQt6.QtWidgets import (
-    QApplication, QDialog, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLineEdit, QListView, QLabel, QGroupBox, QFileDialog, QMessageBox
-)
+from PyQt6.QtWidgets import QDialog, QWidget, QFileDialog, QMessageBox
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
+from .base.ui_settings_window import Ui_SettingsWindow
+from .base.ui_password_dialog import Ui_PasswordDialog
 
-class SettingsWindow(QDialog):
+
+class SettingsWindow(QDialog, Ui_SettingsWindow):
     """設定画面のウィンドウ。
 
-    スキャン対象フォルダ、除外フォルダ、ビューアのパス、対象拡張子などの
-    設定項目を管理します。
+    UIのロジックとPresenterとの連携を担当します。
+    UIのレイアウト定義はUi_SettingsWindowクラスに分離されています。
     """
     def __init__(self, parent: Optional[QWidget] = None):
         """SettingsWindowのコンストラクタ。
@@ -28,92 +27,22 @@ class SettingsWindow(QDialog):
             parent (Optional[QWidget], optional): 親ウィジェット。Defaults to None.
         """
         super().__init__(parent)
-        self.setWindowTitle("設定")
-        self.setMinimumWidth(600)
+        self.setupUi(self)
 
-        main_layout = QVBoxLayout(self)
-
-        # Folder management
-        folder_group = QGroupBox("フォルダ管理")
-        folder_layout = QVBoxLayout()
-        folder_group.setLayout(folder_layout)
-        main_layout.addWidget(folder_group)
-
-        folder_layout.addWidget(QLabel("スキャン対象フォルダ (チェックでプライベート設定)"))
-        scan_layout = QHBoxLayout()
-        self.scan_list_view = QListView()
+        # --- モデルのセットアップ ---
         self.scan_list_model = QStandardItemModel()
         self.scan_list_view.setModel(self.scan_list_model)
-        scan_layout.addWidget(self.scan_list_view)
-        scan_buttons = QVBoxLayout()
-        add_scan_btn = QPushButton("追加")
-        remove_scan_btn = QPushButton("削除")
-        add_scan_btn.clicked.connect(self.add_scan_folder)
-        remove_scan_btn.clicked.connect(self.remove_scan_folder)
-        scan_buttons.addWidget(add_scan_btn)
-        scan_buttons.addWidget(remove_scan_btn)
-        scan_buttons.addStretch()
-        scan_layout.addLayout(scan_buttons)
-        folder_layout.addLayout(scan_layout)
-
-        folder_layout.addWidget(QLabel("除外フォルダ"))
-        exclude_layout = QHBoxLayout()
-        self.exclude_list_view = QListView()
         self.exclude_list_model = QStringListModel()
         self.exclude_list_view.setModel(self.exclude_list_model)
-        exclude_layout.addWidget(self.exclude_list_view)
-        exclude_buttons = QVBoxLayout()
-        add_exclude_btn = QPushButton("追加")
-        remove_exclude_btn = QPushButton("削除")
-        add_exclude_btn.clicked.connect(self.add_exclude_folder)
-        remove_exclude_btn.clicked.connect(self.remove_exclude_folder)
-        exclude_buttons.addWidget(add_exclude_btn)
-        exclude_buttons.addWidget(remove_exclude_btn)
-        exclude_buttons.addStretch()
-        exclude_layout.addLayout(exclude_buttons)
-        folder_layout.addLayout(exclude_layout)
 
-        # Scan settings
-        scan_settings_group = QGroupBox("スキャン設定")
-        scan_settings_layout = QVBoxLayout()
-        scan_settings_group.setLayout(scan_settings_layout)
-        main_layout.addWidget(scan_settings_group)
-
-        scan_settings_layout.addWidget(QLabel("対象拡張子 (カンマ区切り):"))
-        self.scan_extensions_input = QLineEdit()
-        self.scan_extensions_input.setPlaceholderText("例: zip,cbz,rar")
-        scan_settings_layout.addWidget(self.scan_extensions_input)
-
-        # Viewer settings
-        viewer_group = QGroupBox("ビューア設定")
-        viewer_layout = QHBoxLayout()
-        self.viewer_path_input = QLineEdit()
-        browse_viewer_btn = QPushButton("参照")
-        browse_viewer_btn.clicked.connect(self.browse_viewer_path)
-        viewer_layout.addWidget(self.viewer_path_input)
-        viewer_layout.addWidget(browse_viewer_btn)
-        viewer_group.setLayout(viewer_layout)
-        main_layout.addWidget(viewer_group)
-
-        # Security settings
-        security_group = QGroupBox("セキュリティ")
-        security_layout = QHBoxLayout()
-        self.change_password_btn = QPushButton("パスワード変更")
-        # self.change_password_btn.clicked.connect(self.change_password) # To be implemented
-        security_layout.addWidget(self.change_password_btn)
-        security_group.setLayout(security_layout)
-        main_layout.addWidget(security_group)
-
-        # Save/Cancel buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        save_button = QPushButton("保存")
-        cancel_button = QPushButton("キャンセル")
-        save_button.clicked.connect(self.accept)
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(save_button)
-        button_layout.addWidget(cancel_button)
-        main_layout.addLayout(button_layout)
+        # --- シグナルの接続 ---
+        self.add_scan_btn.clicked.connect(self.add_scan_folder)
+        self.remove_scan_btn.clicked.connect(self.remove_scan_folder)
+        self.add_exclude_btn.clicked.connect(self.add_exclude_folder)
+        self.remove_exclude_btn.clicked.connect(self.remove_exclude_folder)
+        self.browse_viewer_btn.clicked.connect(self.browse_viewer_path)
+        self.save_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
 
     def add_scan_folder(self):
         """「スキャン対象フォルダを追加」ボタンのアクション。"""
@@ -188,7 +117,7 @@ class SettingsWindow(QDialog):
         return scan_folders, exclude_folders, viewer_path, scan_extensions
 
 
-class PasswordDialog(QDialog):
+class PasswordDialog(QDialog, Ui_PasswordDialog):
     """パスワード入力または設定を行うダイアログ。
 
     'authenticate'モードと'set_password'モードに応じてUIと動作を切り替えます。
@@ -202,35 +131,12 @@ class PasswordDialog(QDialog):
                                   Defaults to "authenticate".
         """
         super().__init__(parent)
+        self.setupUi(self, mode)
         self.mode = mode
-        self.setWindowTitle("パスワード認証" if mode == "authenticate" else "パスワード設定")
-        
-        main_layout = QVBoxLayout(self)
 
-        if self.mode == "authenticate":
-            main_layout.addWidget(QLabel("パスワードを入力してください:"))
-            self.password_input = QLineEdit()
-            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.password_input)
-        elif self.mode == "set_password":
-            main_layout.addWidget(QLabel("新しいパスワードを入力してください:"))
-            self.new_password_input = QLineEdit()
-            self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.new_password_input)
-
-            main_layout.addWidget(QLabel("新しいパスワード (確認):"))
-            self.confirm_password_input = QLineEdit()
-            self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.confirm_password_input)
-
-        button_layout = QHBoxLayout()
-        ok_button = QPushButton("OK" if mode == "authenticate" else "設定")
-        cancel_button = QPushButton("キャンセル")
-        ok_button.clicked.connect(self._handle_ok_button)
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(ok_button)
-        button_layout.addWidget(cancel_button)
-        main_layout.addLayout(button_layout)
+        # --- シグナルの接続 ---
+        self.ok_button.clicked.connect(self._handle_ok_button)
+        self.cancel_button.clicked.connect(self.reject)
 
     def _handle_ok_button(self):
         """OKボタンがクリックされたときの処理。"""

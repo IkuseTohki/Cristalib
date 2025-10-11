@@ -108,7 +108,7 @@ class ApplicationController:
         """
         if self.is_private_mode:
             self.is_private_mode = False
-            self.main_window.mode_button.setText("プライベートモードへ")
+            self.main_window.update_private_mode_view(is_private=self.is_private_mode)
             self.load_books_to_list()
         else:
             stored_hash = self.db_manager.get_setting('password_hash')
@@ -121,7 +121,7 @@ class ApplicationController:
                 entered_password = auth_dialog.get_password()
                 if verify_password(stored_hash, entered_password):
                     self.is_private_mode = True
-                    self.main_window.mode_button.setText("通常モードへ")
+                    self.main_window.update_private_mode_view(is_private=self.is_private_mode)
                     self.load_books_to_list()
                 else:
                     QMessageBox.warning(self.main_window, "認証失敗", "パスワードが正しくありません。")
@@ -130,16 +130,8 @@ class ApplicationController:
 
     def open_selected_book_in_viewer(self):
         """テーブルで選択されている書籍を外部ビューアで開く。"""
-        selected_indexes = self.main_window.book_table_view.selectedIndexes()
-        if not selected_indexes:
-            return
-
-        proxy_index = selected_indexes[0]
-        source_index = self.main_window.proxy_model.mapToSource(proxy_index)
-        book: Book = self.main_window.book_table_model.itemFromIndex(source_index).data(Qt.ItemDataRole.UserRole)
-
+        book = self.main_window.get_selected_book()
         if not book:
-            QMessageBox.warning(self.main_window, "エラー", "選択された蔵書情報が見つかりません。")
             return
 
         viewer_path = self.db_manager.get_setting('viewer_path')

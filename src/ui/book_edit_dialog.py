@@ -5,14 +5,12 @@ BookEditDialogクラスは、ユーザーが書籍のメタデータ（タイト
 編集するためのフォームを提供します。
 """
 from typing import Optional
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, 
-    QLineEdit, QSpinBox, QCheckBox, QPushButton, QWidget
-)
+from PyQt6.QtWidgets import QDialog, QWidget
 from src.models.book import Book
+from .base.ui_book_edit_dialog import Ui_BookEditDialog
 
 
-class BookEditDialog(QDialog):
+class BookEditDialog(QDialog, Ui_BookEditDialog):
     """書籍情報を編集するためのダイアログ。"""
 
     def __init__(self, parent: Optional[QWidget] = None, book: Optional[Book] = None):
@@ -23,48 +21,13 @@ class BookEditDialog(QDialog):
             book (Optional[Book], optional): 編集対象のBookオブジェクト。Defaults to None.
         """
         super().__init__(parent)
-        self.setWindowTitle("書籍情報編集")
-        self.setMinimumWidth(600)
+        self.setupUi(self)
+        
         self.original_book_id = book.id if book else None
 
-        main_layout = QVBoxLayout(self)
-        form_layout = QFormLayout()
-
-        self.title_input = QLineEdit()
-        self.subtitle_input = QLineEdit()
-        self.volume_input = QSpinBox()
-        self.volume_input.setMinimum(0)
-        self.volume_input.setMaximum(9999)
-        self.author_input = QLineEdit()
-        self.original_author_input = QLineEdit()
-        self.series_input = QLineEdit()
-        self.category_input = QLineEdit()
-        self.rating_input = QSpinBox()
-        self.rating_input.setMinimum(0)
-        self.rating_input.setMaximum(5)
-        self.is_magazine_collection_checkbox = QCheckBox()
-
-        form_layout.addRow("タイトル:", self.title_input)
-        form_layout.addRow("サブタイトル:", self.subtitle_input)
-        form_layout.addRow("巻数:", self.volume_input)
-        form_layout.addRow("著者:", self.author_input)
-        form_layout.addRow("原作者:", self.original_author_input)
-        form_layout.addRow("シリーズ:", self.series_input)
-        form_layout.addRow("カテゴリ:", self.category_input)
-        form_layout.addRow("評価 (0-5):", self.rating_input)
-        form_layout.addRow("雑誌版:", self.is_magazine_collection_checkbox)
-
-        main_layout.addLayout(form_layout)
-
-        button_layout = QHBoxLayout()
-        save_button = QPushButton("保存")
-        cancel_button = QPushButton("キャンセル")
-        save_button.clicked.connect(self.accept)
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addStretch()
-        button_layout.addWidget(save_button)
-        button_layout.addWidget(cancel_button)
-        main_layout.addLayout(button_layout)
+        # --- シグナルの接続 ---
+        self.save_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
 
         if book:
             self.set_book_data(book)
