@@ -49,12 +49,26 @@ class ApplicationController:
 
     def connect_signals(self):
         """UIのシグナルとロジックのスロットを接続する。"""
+        # Pylanceなどの静的解析ツールが、setupUiで動的に生成されるメンバーを
+        # 認識できずに警告を出すことがあるため、Noneでないことを明示的に表明する。
+        assert self.main_window.settings_action is not None
+        assert self.main_window.mode_button is not None
+        assert self.main_window.sync_button is not None
+        assert self.main_window.viewer_button is not None
+        assert self.main_window.edit_button is not None
+        assert self.main_window.book_table_view is not None
+
+        # Menu actions
+        self.main_window.settings_action.triggered.connect(self.authenticate_and_open_settings)
+
+        # Buttons
         self.main_window.sync_button.clicked.connect(self.run_scan_and_refresh)
-        self.main_window.settings_button.clicked.connect(self.authenticate_and_open_settings)
         self.main_window.viewer_button.clicked.connect(self.open_selected_book_in_viewer)
-        self.main_window.book_table_view.doubleClicked.connect(self.open_selected_book_in_viewer)
-        self.main_window.mode_button.clicked.connect(self.toggle_private_mode)
         self.main_window.edit_button.clicked.connect(self.open_book_edit_dialog)
+        self.main_window.mode_button.clicked.connect(self.toggle_private_mode)
+        
+        # Table view
+        self.main_window.book_table_view.doubleClicked.connect(self.open_selected_book_in_viewer)
 
     def authenticate_and_open_settings(self):
         """パスワード認証を行い、成功すれば設定ウィンドウを開く。

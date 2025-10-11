@@ -5,9 +5,10 @@
 ロジックは含めません。
 """
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit, QTableView, QLabel, QAbstractItemView, QMenuBar, QMenu
+    QPushButton, QLineEdit, QTableView, QAbstractItemView, QMenuBar, QMenu
 )
 
 class Ui_MainWindow(object):
@@ -31,16 +32,10 @@ class Ui_MainWindow(object):
         # メニューバー
         self.menu_bar = MainWindow.menuBar()
         self.view_menu = self.menu_bar.addMenu("表示")
-
-        # ヘッダー
-        header_layout = QHBoxLayout()
-        self.mode_button = QPushButton("プライベートモードへ")
-        self.settings_button = QPushButton("設定")
-        header_layout.addWidget(QLabel("蔵書管理"))
-        header_layout.addStretch()
-        header_layout.addWidget(self.mode_button)
-        header_layout.addWidget(self.settings_button)
-        main_layout.addLayout(header_layout)
+        
+        # ツールメニューの追加
+        tools_menu = self.menu_bar.addMenu("ツール")
+        self.settings_action = tools_menu.addAction("設定")
 
         # 検索・同期
         search_layout = QHBoxLayout()
@@ -49,10 +44,12 @@ class Ui_MainWindow(object):
         self.sync_button = QPushButton("同期")
         self.edit_button = QPushButton("編集")
         self.viewer_button = QPushButton("ビューアで開く")
+        self.mode_button = QPushButton("プライベートモードへ")
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.sync_button)
         search_layout.addWidget(self.edit_button)
         search_layout.addWidget(self.viewer_button)
+        search_layout.addWidget(self.mode_button)
         main_layout.addLayout(search_layout)
 
         # 蔵書テーブル
