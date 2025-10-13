@@ -10,7 +10,7 @@ import subprocess
 import json
 from typing import Optional
 from PyQt6.QtCore import QThread, QObject, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog
+from PyQt6.QtWidgets import QApplication, QFileDialog
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
 from src.ui.settings_window import SettingsWindow, PasswordDialog
@@ -115,7 +115,7 @@ class ApplicationController(IApplicationController):
             # 認証ダイアログを表示
             password_dialog = self.dialog_factory.create_password_dialog()
             password_dialog.set_mode('authenticate')
-            if password_dialog.exec() == QDialog.DialogCode.Accepted:
+            if password_dialog.exec():
                 password = password_dialog.get_password()
                 if verify_password(password_hash, password):
                     self._open_settings_window() # 認証成功
@@ -127,7 +127,7 @@ class ApplicationController(IApplicationController):
         if self.main_window.ask_question("初回パスワード設定", "設定画面を保護するためのパスワードを初回設定します。"):
             password_dialog = self.dialog_factory.create_password_dialog()
             password_dialog.set_mode('set_password')
-            if password_dialog.exec() == QDialog.DialogCode.Accepted:
+            if password_dialog.exec():
                 new_password = password_dialog.get_password()
                 # _update_password_in_dbを直接呼び出す
                 if self._update_password_in_db("", new_password):
@@ -255,7 +255,7 @@ class ApplicationController(IApplicationController):
 
         book_edit_dialog = self.dialog_factory.create_book_edit_dialog()
         book_edit_dialog.display_book_data(latest_book_data)
-        if book_edit_dialog.exec() == QDialog.DialogCode.Accepted:
+        if book_edit_dialog.exec():
             updated_book = book_edit_dialog.get_book_data()
             self.db_manager.update_book(updated_book)
             self.load_books_to_list() # リストを更新
@@ -335,7 +335,7 @@ class ApplicationController(IApplicationController):
         if current_hash:
             password_dialog = self.dialog_factory.create_password_dialog()
             password_dialog.set_mode('authenticate')
-            if password_dialog.exec() == QDialog.DialogCode.Accepted:
+            if password_dialog.exec():
                 old_password = password_dialog.get_password()
                 # ここではverify_passwordは呼ばない。_update_password_in_dbで検証される
             else:
@@ -344,7 +344,7 @@ class ApplicationController(IApplicationController):
         # 新しいパスワードの設定を求める
         password_dialog = self.dialog_factory.create_password_dialog()
         password_dialog.set_mode('set_password')
-        if password_dialog.exec() == QDialog.DialogCode.Accepted:
+        if password_dialog.exec():
             new_password = password_dialog.get_password()
         else:
             return # キャンセルされたら終了
@@ -367,7 +367,7 @@ class ApplicationController(IApplicationController):
         # パスワードが設定されていれば認証を行う
         password_dialog = self.dialog_factory.create_password_dialog()
         password_dialog.set_mode('authenticate')
-        if password_dialog.exec() != QDialog.DialogCode.Accepted:
+        if not password_dialog.exec():
             return False # キャンセルされたら認証失敗
         
         password = password_dialog.get_password()

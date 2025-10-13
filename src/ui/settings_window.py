@@ -234,13 +234,14 @@ class PasswordDialog(QDialog, Ui_PasswordDialog, IPasswordDialog):
             self.ok_button.setText("設定")
         self.adjustSize()
 
-    def exec(self) -> int:
-        """ダイアログを表示し、結果を返す。
+    def exec(self) -> bool:
+        """ダイアログを表示し、結果をbool値で返す。
 
         Returns:
-            int: ダイアログの実行結果 (QDialog.DialogCode.Accepted または QDialog.DialogCode.Rejected)。
+            bool: Acceptされた場合はTrue、それ以外はFalse。
         """
-        return super().exec()
+        result = super().exec()
+        return result == QDialog.DialogCode.Accepted
 
     def accept(self):
         """OKボタンが押されたとき、またはEnterキーが押されたときに呼び出される。"""

@@ -66,10 +66,10 @@ class BookEditDialog(QDialog, Ui_BookEditDialog, IBookEditDialog):
             is_magazine_collection=self.is_magazine_collection_checkbox.isChecked(),
         )
 
-    def exec(self) -> int:
-        """ダイアログを表示し、結果を返す。
+    def exec(self) -> bool:
+        """ダイアログを表示し、結果をbool値で返す。
 
         Returns:
-            int: ダイアログの実行結果 (QDialog.DialogCode.Accepted または QDialog.DialogCode.Rejected)。
+            bool: Acceptされた場合はTrue、それ以外はFalse。
         """
-        return super().exec()
+        return super().exec() == QDialog.DialogCode.Accepted

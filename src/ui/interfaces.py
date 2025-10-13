@@ -218,11 +218,11 @@ class IPasswordDialog(QObject):
         """
         raise NotImplementedError
 
-    def exec(self) -> int:
+    def exec(self) -> bool:
         """ダイアログを表示し、結果を返す。
 
         Returns:
-            int: ダイアログの実行結果 (QDialog.DialogCode.Accepted または QDialog.DialogCode.Rejected)。
+            bool: ユーザーがAcceptした場合はTrue、それ以外はFalse。
         """
         raise NotImplementedError
 
@@ -260,11 +260,11 @@ class IBookEditDialog(QObject):
         """
         raise NotImplementedError
 
-    def exec(self) -> int:
+    def exec(self) -> bool:
         """ダイアログを表示し、結果を返す。
 
         Returns:
-            int: ダイアログの実行結果 (QDialog.DialogCode.Accepted または QDialog.DialogCode.Rejected)。
+            bool: ユーザーがAcceptした場合はTrue、それ以外はFalse。
         """
         raise NotImplementedError
 
