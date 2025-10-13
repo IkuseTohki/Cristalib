@@ -10,7 +10,7 @@ import subprocess
 import json
 from typing import Optional
 from PyQt6.QtCore import QModelIndex, Qt, QThread, QObject, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QMessageBox, QDialog, QFileDialog
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
 from src.ui.settings_window import SettingsWindow, PasswordDialog
@@ -120,15 +120,11 @@ class ApplicationController(IApplicationController):
                 if verify_password(password_hash, password):
                     self._open_settings_window() # 認証成功
                 else:
-                    QMessageBox.warning(None, "認証エラー", "パスワードが正しくありません。")
+                    self.main_window.show_warning("認証エラー", "パスワードが正しくありません。")
             return # キャンセルされた場合も何もしない
         
         # --- パスワードが未設定の場合（初回設定） ---
-        reply = QMessageBox.information(None, "初回パスワード設定", 
-                                        "設定画面を保護するためのパスワードを初回設定します。",
-                                        QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
-        
-        if reply == QMessageBox.StandardButton.Ok:
+        if self.main_window.ask_question("初回パスワード設定", "設定画面を保護するためのパスワードを初回設定します。"):
             password_dialog = self.dialog_factory.create_password_dialog()
             password_dialog.set_mode('set_password')
             if password_dialog.exec() == QDialog.DialogCode.Accepted:
@@ -227,18 +223,18 @@ class ApplicationController(IApplicationController):
 
         viewer_path = self.db_manager.get_setting('viewer_path')
         if not viewer_path or not os.path.exists(viewer_path):
-            QMessageBox.warning(None, "ビューア未設定", "ビューアのパスが設定されていないか、パスが無効です。\n設定画面から設定してください。")
+            self.main_window.show_warning("ビューア未設定", "ビューアのパスが設定されていないか、パスが無効です。\n設定画面から設定してください。")
             return
 
         if not book.file_path or not os.path.exists(book.file_path):
-            QMessageBox.warning(None, "ファイルエラー", f"書籍ファイルが見つかりません。\nパス: {book.file_path}")
+            self.main_window.show_warning("ファイルエラー", f"書籍ファイルが見つかりません。\nパス: {book.file_path}")
             return
 
         try:
             subprocess.Popen([viewer_path, book.file_path])
             self.main_window.show_status_message(f"ビューアで {os.path.basename(book.file_path)} を開きました。")
         except Exception as e:
-            QMessageBox.critical(None, "起動エラー", f"ビューアの起動に失敗しました。\nエラー: {e}")
+            self.main_window.show_critical("起動エラー", f"ビューアの起動に失敗しました。\nエラー: {e}")
 
     def open_book_edit_dialog(self, index=None):
         """書籍編集ダイアログを開く。
@@ -249,12 +245,12 @@ class ApplicationController(IApplicationController):
         """
         book = self.main_window.get_selected_book()
         if not book:
-            QMessageBox.information(None, "情報", "書籍が選択されていません。")
+            self.main_window.show_information("情報", "書籍が選択されていません。")
             return
 
         latest_book_data = self.db_manager.get_book_by_id(book.id)
         if not latest_book_data:
-            QMessageBox.warning(None, "エラー", "データベースから書籍情報を取得できませんでした。")
+            self.main_window.show_warning("エラー", "データベースから書籍情報を取得できませんでした。")
             return
 
         book_edit_dialog = self.dialog_factory.create_book_edit_dialog()
@@ -310,23 +306,23 @@ class ApplicationController(IApplicationController):
         current_hash = self.db_manager.get_setting('password_hash')
 
         if not new_password:
-            QMessageBox.warning(None, "パスワードエラー", "新しいパスワードは空にできません。")
+            self.main_window.show_warning("パスワードエラー", "新しいパスワードは空にできません。")
             return False
 
         # パスワードが設定済みの場合、古いパスワードを検証
         if current_hash:
             if not verify_password(current_hash, old_password):
-                QMessageBox.warning(None, "認証エラー", "古いパスワードが正しくありません。")
+                self.main_window.show_warning("認証エラー", "古いパスワードが正しくありません。")
                 return False
 
         # 新しいパスワードをハッシュ化して保存
         try:
             new_hash = hash_password(new_password)
             self.db_manager.set_setting('password_hash', new_hash)
-            QMessageBox.information(None, "成功", "パスワードが正常に設定されました。")
+            self.main_window.show_information("成功", "パスワードが正常に設定されました。")
             return True
         except Exception as e:
-            QMessageBox.critical(None, "エラー", f"パスワードの設定に失敗しました。\n{e}")
+            self.main_window.show_critical("エラー", f"パスワードの設定に失敗しました。\n{e}")
             return False
 
     def change_password(self):
@@ -376,7 +372,7 @@ class ApplicationController(IApplicationController):
         
         password = password_dialog.get_password()
         if not verify_password(password_hash, password):
-            QMessageBox.warning(None, "認証エラー", "パスワードが正しくありません。")
+            self.main_window.show_warning("認証エラー", "パスワードが正しくありません。")
             return False # 認証失敗
         
         return True # 認証成功
@@ -419,13 +415,13 @@ class ApplicationController(IApplicationController):
                 current_settings['scan_folders'] = scan_folders
                 self.settings_window.display_settings(current_settings)
             else:
-                QMessageBox.information(None, "情報", "選択されたフォルダは既に追加されています。")
+                self.main_window.show_information("情報", "選択されたフォルダは既に追加されています。")
 
     def _remove_scan_path(self):
         """スキャン対象フォルダを削除する。"""
         selected_paths = self.settings_window.get_selected_scan_paths()
         if not selected_paths:
-            QMessageBox.information(None, "情報", "削除するスキャン対象フォルダを選択してください。")
+            self.main_window.show_information("情報", "削除するスキャン対象フォルダを選択してください。")
             return
 
         current_settings = self.settings_window.get_settings()
@@ -447,13 +443,13 @@ class ApplicationController(IApplicationController):
                 current_settings['exclude_folders'] = exclude_folders
                 self.settings_window.display_settings(current_settings)
             else:
-                QMessageBox.information(None, "情報", "選択されたフォルダは既に追加されています。")
+                self.main_window.show_information("情報", "選択されたフォルダは既に追加されています。")
 
     def _remove_exclude_path(self):
         """除外対象フォルダを削除する。"""
         selected_paths = self.settings_window.get_selected_exclude_paths()
         if not selected_paths:
-            QMessageBox.information(None, "情報", "削除する除外対象フォルダを選択してください。")
+            self.main_window.show_information("情報", "削除する除外対象フォルダを選択してください。")
             return
 
         current_settings = self.settings_window.get_settings()

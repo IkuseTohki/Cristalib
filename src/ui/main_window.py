@@ -7,7 +7,7 @@ UIのレイアウト定義はUi_MainWindowクラスに分離されています�
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from PyQt6.QtCore import QSortFilterProxyModel, Qt, pyqtSignal # pyqtSignalをインポート
-from PyQt6.QtWidgets import QMainWindow, QWidget
+from PyQt6.QtWidgets import QMainWindow, QWidget, QMessageBox
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction # QActionをインポート
 from src.models.book import Book
 from .base.ui_main_window import Ui_MainWindow
@@ -206,3 +206,45 @@ class MainWindow(QMainWindow, Ui_MainWindow, IMainWindow): # IMainWindowを継�
             message (str): ステータスバーに表示するメッセージ。
         """
         self.statusBar().showMessage(message)
+
+    def show_information(self, title: str, message: str):
+        """情報メッセージダイアログを表示する。
+
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        QMessageBox.information(self, title, message)
+
+    def show_warning(self, title: str, message: str):
+        """警告メッセージダイアログを表示する。
+
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        QMessageBox.warning(self, title, message)
+
+    def show_critical(self, title: str, message: str):
+        """エラーメッセージダイアログを表示する。
+
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        QMessageBox.critical(self, title, message)
+
+    def ask_question(self, title: str, message: str) -> bool:
+        """確認メッセージダイアログを表示し、ユーザーの応答(OK/Cancel)を返す。
+
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+
+        Returns:
+            bool: ユーザーがOKを選択した場合はTrue、それ以外はFalse。
+        """
+        reply = QMessageBox.question(self, title, message,
+                                     QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                                     QMessageBox.StandardButton.Cancel)
+        return reply == QMessageBox.StandardButton.Ok

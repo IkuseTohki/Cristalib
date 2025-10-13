@@ -82,6 +82,41 @@ class IMainWindow(QObject): # QObjectを継承し、ABCは継承しない
         """
         raise NotImplementedError
 
+    def show_information(self, title: str, message: str):
+        """情報メッセージダイアログを表示する。
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        raise NotImplementedError
+
+    def show_warning(self, title: str, message: str):
+        """警告メッセージダイアログを表示する。
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        raise NotImplementedError
+
+    def show_critical(self, title: str, message: str):
+        """エラーメッセージダイアログを表示する。
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        """
+        raise NotImplementedError
+
+    def ask_question(self, title: str, message: str) -> bool:
+        """確認メッセージダイアログを表示し、ユーザーの応答(OK/Cancel)を返す。
+        Args:
+            title (str): ダイアログのタイトル。
+            message (str): 表示するメッセージ。
+        
+        Returns:
+            bool: ユーザーがOKを選択した場合はTrue、それ以外はFalse。
+        """
+        raise NotImplementedError
+
 
 class ISettingsWindow(QObject):
     """設定ウィンドウがPresenterに提供すべきインターフェース。"""
