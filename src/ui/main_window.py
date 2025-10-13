@@ -7,7 +7,7 @@ UIのレイアウト定義はUi_MainWindowクラスに分離されています�
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from PyQt6.QtCore import QSortFilterProxyModel, Qt, pyqtSignal # pyqtSignalをインポート
-from PyQt6.QtWidgets import QMainWindow, QWidget, QMessageBox, QFileDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QMessageBox, QFileDialog
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction # QActionをインポート
 from src.models.book import Book
 from .base.ui_main_window import Ui_MainWindow
@@ -251,9 +251,13 @@ class MainWindow(QMainWindow, Ui_MainWindow, IMainWindow): # IMainWindowを継�
 
     def get_existing_directory(self, caption: str) -> Optional[str]:
         """フォルダ選択ダイアログを開き、選択されたフォルダパスを返す。"""
-        return QFileDialog.getExistingDirectory(self, caption)
+        # アクティブなウィンドウを親に設定する
+        parent = QApplication.activeWindow() or self
+        return QFileDialog.getExistingDirectory(parent, caption)
 
     def get_open_file_name(self, caption: str, filter: str) -> Optional[str]:
         """ファイル選択ダイアログを開き、選択されたファイルパスを返す。"""
-        file_path, _ = QFileDialog.getOpenFileName(self, caption, "", filter)
+        # アクティブなウィンドウを親に設定する
+        parent = QApplication.activeWindow() or self
+        file_path, _ = QFileDialog.getOpenFileName(parent, caption, "", filter)
         return file_path if file_path else None
