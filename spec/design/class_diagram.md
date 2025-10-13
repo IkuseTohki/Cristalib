@@ -3,9 +3,22 @@
 ## 1. 概要
 
 本ドキュメントは、蔵書管理アプリケーションの主要なクラスとその関係性を示します。
-MVP (Model-View-Presenter) パターンを意識した設計となっており、UI の定義とロジックが分離されています。
+クリーンアーキテクチャの思想を参考に、関心の分離と依存関係の制御を目指した設計となっています。
 
-## 2. クラス図
+## 2. レイヤー構造
+
+本アプリケーションは、関心の分離と依存関係の制御を目的とした、クリーンアーキテクチャに近いレイヤー構造を採用しています。各レイヤーは以下の責務を持ちます。
+
+- **UI (View) 層:** ユーザーインターフェースの表示とユーザー入力を担当します。`View_Logic`（ウィンドウの振る舞いを定義）と`View_Base`（ウィジェットの配置を定義）に分かれています。この層は、内側のレイヤーについて一切関知しません。
+- **Factories 層:** UI コンポーネントの具体的なインスタンスを生成する責務を持ちます。これにより、`Controller`層が具体的な UI クラスに依存することを防ぎます。
+- **Interfaces 層:** 各レイヤー間の境界を定義するインターフェース（抽象クラス）群です。依存性の逆転を実現し、内側のレイヤーが外側のレイヤーに依存しないようにするための重要な役割を担います。
+- **Controller 層:** アプリケーションのユースケースを実装し、UI からの入力を受け取って`Core`層のビジネスロジックを呼び出し、その結果を UI に反映させるよう指示します。
+- **Core 層:** アプリケーションの中核となるビジネスロジックとデータアクセスを担当します。データベース操作、ファイルスキャン、ファイル名解析などが含まれます。この層は UI について一切関知しません。
+- **Models 層:** アプリケーション全体で利用されるデータ構造（エンティティ）を定義します。
+
+依存関係は常に外側のレイヤーから内側のレイヤーに向かってのみ発生し、`Interfaces`層を介することで、このルールが徹底されます。
+
+## 3. クラス図
 
 ```mermaid
 classDiagram
@@ -21,23 +34,73 @@ classDiagram
         }
     end
 
+    subgraph Factories
+        class DialogFactory {
+            +create_password_dialog()
+            +create_book_edit_dialog()
+        }
+    end
+
+    subgraph Interfaces
+        class IDialogFactory {
+            <<interface>>
+            +create_password_dialog()
+            +create_book_edit_dialog()
+        }
+        class IMainWindow {
+            <<interface>>
+            +sync_requested
+            +settings_requested
+            +show_warning(title, message)
+            +...
+        }
+        class ISettingsWindow {
+            <<interface>>
+            +save_settings_requested
+            +change_password_requested
+            +...
+        }
+        class IPasswordDialog {
+            <<interface>>
+            +get_password()
+            +set_mode(mode)
+            +exec()
+        }
+        class IBookEditDialog {
+            <<interface>>
+            +display_book_data(book)
+            +get_book_data()
+            +exec()
+        }
+        class IApplicationController {
+            <<interface>>
+            +authenticate_and_open_settings()
+            +change_password()
+            +...
+        }
+    end
+
     subgraph View_Logic
         class MainWindow {
             +display_books(books)
             +get_selected_book()
-            +update_private_mode_view(is_private)
+            +show_warning(title, message)
             +...
         }
         class SettingsWindow {
-            +set_settings(...)
+            +display_settings(...)
             +get_settings()
+            +...
         }
         class PasswordDialog {
             +get_password()
+            +set_mode(mode)
+            +...
         }
         class BookEditDialog {
-            +set_book_data(book)
+            +display_book_data(book)
             +get_book_data()
+            +...
         }
     end
 
@@ -60,6 +123,7 @@ classDiagram
         class DatabaseManager {
             +save_book(book)
             +get_all_books()
+            +get_books_for_display()
             +...
         }
         class FileNameParser {
@@ -88,15 +152,26 @@ classDiagram
     end
 
     %% --- Relationships ---
-    ApplicationController --> MainWindow : controls
-    ApplicationController --> SettingsWindow : controls
-    ApplicationController --> PasswordDialog : controls
-    ApplicationController --> BookEditDialog : controls
+    QObject <|-- IMainWindow
+    QObject <|-- ISettingsWindow
+    QObject <|-- IPasswordDialog
+    QObject <|-- IBookEditDialog
+
+    IMainWindow <|.. MainWindow : implements
+    ISettingsWindow <|.. SettingsWindow : implements
+    IPasswordDialog <|.. PasswordDialog : implements
+    IBookEditDialog <|.. BookEditDialog : implements
+    IApplicationController <|.. ApplicationController : implements
+    IDialogFactory <|.. DialogFactory : implements
+
+    ApplicationController ..> IMainWindow : uses
+    ApplicationController ..> ISettingsWindow : uses
+    ApplicationController ..> IDialogFactory : uses
     ApplicationController --> FileScanner : uses
     ApplicationController --> DatabaseManager : uses
-    ApplicationController --> FileNameParser : uses
-    ApplicationController --> ParsingRuleLoader : uses
-    ApplicationController --> Security : uses
+
+    DialogFactory ..> IPasswordDialog : creates
+    DialogFactory ..> IBookEditDialog : creates
 
     MainWindow <|-- Ui_MainWindow : inherits
     SettingsWindow <|-- Ui_SettingsWindow : inherits
@@ -109,13 +184,45 @@ classDiagram
     DatabaseManager ..> Book : manages
 ```
 
-## 3. クラス詳細
+## 4. クラス詳細
 
 ### Controller
 
 #### `ApplicationController`
 
-アプリケーション全体の動作を制御する Presenter としての役割を担います。UI（View）からのユーザーイベントを受け取り、それに応じて Core（Model）のビジネスロジックを実行し、最終的な結果を View に表示するよう指示します。View と Model の間の仲介役として、両者が互いに直接関与しないように分離する責務を持ちます。
+アプリケーション全体の動作を制御する Presenter としての役割を担います。UI（View）からのユーザーイベントを受け取り、それに応じて Core（Model）のビジネスロジックを実行し、最終的な結果を View に表示するよう指示します。View と Model の間の仲介役として、両者が互いに直接関与しないように分離する責務を持ちます。具体的な UI クラス（ダイアログ等）に依存せず、`IDialogFactory` を通じて UI コンポーネントを生成します。
+
+### Factories
+
+#### `DialogFactory`
+
+`IDialogFactory`インターフェースの具体的な実装クラスです。`PasswordDialog`や`BookEditDialog`といった、具体的な UI ダイアログのインスタンスを生成する責務を持ちます。
+
+### Interfaces
+
+#### `IDialogFactory`
+
+ダイアログ生成の責務を抽象化するインターフェースです。`ApplicationController`は、このインターフェースに依存することで、具体的なダイアログクラスを知ることなく、ダイアログの生成を要求できます。
+
+#### `IMainWindow`
+
+メインウィンドウが Presenter に提供すべきインターフェースを定義します。ユーザー操作の通知（`pyqtSignal`）や、メッセージ表示、書籍リストの更新といった、Presenter が View を操作するためのメソッド（`show_warning`など）を抽象化します。
+
+#### `ISettingsWindow`
+
+設定ウィンドウが Presenter に提供すべきインターフェースを定義します。
+
+#### `IPasswordDialog`
+
+パスワードダイアログが Presenter に提供すべきインターフェースを定義します。
+
+#### `IBookEditDialog`
+
+書籍編集ダイアログが Presenter に提供すべきインターフェースを定義します。
+
+#### `IApplicationController`
+
+ApplicationController が View に提供すべきインターフェースを定義します。View が Presenter の具体的な実装に依存せず、抽象的な操作を呼び出せるようにします。
 
 ### View_Logic
 
@@ -169,7 +276,7 @@ SQLite データベースとのすべてのやり取りをカプセル化する�
 
 一冊の書籍に関するすべてのメタデータ（タイトル、著者、ファイルパスなど）を保持するデータクラスです。アプリケーション全体で書籍情報をやり取りする際の標準的な形式として利用されます。
 
-### 3.1. 関係性
+### 4.1. 関係性
 
 - `<|--`: 継承 (Inheritance) - View ロジッククラスが View 定義クラスを継承して UI を構築します。
 - `-->`: 関連 (Association) - クラス間の持続的な関係（例: `ApplicationController`が`MainWindow`を制御する）。
