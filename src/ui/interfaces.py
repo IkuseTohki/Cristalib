@@ -117,6 +117,29 @@ class IMainWindow(QObject): # QObjectを継承し、ABCは継承しない
         """
         raise NotImplementedError
 
+    def get_existing_directory(self, caption: str) -> Optional[str]:
+        """フォルダ選択ダイアログを表示し、選択されたフォルダパスを返す。
+
+        Args:
+            caption (str): ダイアログのキャプション。
+
+        Returns:
+            Optional[str]: 選択されたフォルダのパス。未選択の場合はNone。
+        """
+        raise NotImplementedError
+
+    def get_open_file_name(self, caption: str, filter: str) -> Optional[str]:
+        """ファイル選択ダイアログを表示し、選択されたファイルパスを返す。
+
+        Args:
+            caption (str): ダイアログのキャプション。
+            filter (str): ファイルの種類をフィルタリングする文字列。
+
+        Returns:
+            Optional[str]: 選択されたファイルのパス。未選択の場合はNone。
+        """
+        raise NotImplementedError
+
 
 class ISettingsWindow(QObject):
     """設定ウィンドウがPresenterに提供すべきインターフェース。"""

@@ -10,17 +10,16 @@ import subprocess
 import json
 from typing import Optional
 from PyQt6.QtCore import QThread, QObject, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QFileDialog
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
-from src.ui.settings_window import SettingsWindow, PasswordDialog
-from src.ui.book_edit_dialog import BookEditDialog
+from src.ui.settings_window import SettingsWindow
 from src.core.database import DatabaseManager
 from src.core.security import hash_password, verify_password
 from src.core.scanner import FileScanner
 from src.core.parser import ParsingRuleLoader, FileNameParser
 from src.models.book import Book
-from src.ui.interfaces import IMainWindow, IApplicationController, ISettingsWindow, IBookEditDialog, IDialogFactory
+from src.ui.interfaces import IMainWindow, IApplicationController, ISettingsWindow, IDialogFactory
 from src.ui.dialog_factory import DialogFactory
 
 
@@ -213,7 +212,7 @@ class ApplicationController(IApplicationController):
         """選択された書籍を外部ビューアで開く。
 
         Args:
-            index (QModelIndex, optional): 選択されたアイテムのインデックス。
+            index (Optional[QModelIndex]): 選択されたアイテムのインデックス。
                                            通常はmain_windowから取得するためNoneでよい。
         """
         book = self.main_window.get_selected_book()
@@ -240,7 +239,7 @@ class ApplicationController(IApplicationController):
         """書籍編集ダイアログを開く。
 
         Args:
-            index (QModelIndex, optional): 選択されたアイテムのインデックス。
+            index (Optional[QModelIndex]): 選択されたアイテムのインデックス。
                                            通常はmain_windowから取得するためNoneでよい。
         """
         book = self.main_window.get_selected_book()
@@ -377,34 +376,9 @@ class ApplicationController(IApplicationController):
         
         return True # 認証成功
 
-    def _open_folder_dialog(self, caption: str) -> Optional[str]:
-        """フォルダ選択ダイアログを開き、選択されたフォルダパスを返すヘルパーメソッド。
-
-        Args:
-            caption (str): ダイアログのタイトル。
-
-        Returns:
-            Optional[str]: 選択されたフォルダの絶対パス。キャンセルされた場合はNone。
-        """
-        folder_path = QFileDialog.getExistingDirectory(None, caption)
-        return folder_path if folder_path else None
-
-    def _open_file_dialog(self, caption: str, filter: str) -> Optional[str]:
-        """ファイル選択ダイアログを開き、選択されたファイルパスを返すヘルパーメソッド。
-
-        Args:
-            caption (str): ダイアログのタイトル。
-            filter (str): ファイルフィルタ（例: "Images (*.png *.jpg);;Text files (*.txt)"）。
-
-        Returns:
-            Optional[str]: 選択されたファイルの絶対パス。キャンセルされた場合はNone。
-        """
-        file_path, _ = QFileDialog.getOpenFileName(None, caption, "", filter)
-        return file_path if file_path else None
-
     def _add_scan_path(self):
         """スキャン対象フォルダを追加する。"""
-        folder_path = self._open_folder_dialog("スキャン対象フォルダを選択")
+        folder_path = self.main_window.get_existing_directory("スキャン対象フォルダを選択")
         if folder_path:
             # 現在の設定を取得し、新しいパスを追加してUIを更新
             current_settings = self.settings_window.get_settings()
@@ -434,7 +408,7 @@ class ApplicationController(IApplicationController):
 
     def _add_exclude_path(self):
         """除外対象フォルダを追加する。"""
-        folder_path = self._open_folder_dialog("除外対象フォルダを選択")
+        folder_path = self.main_window.get_existing_directory("除外対象フォルダを選択")
         if folder_path:
             current_settings = self.settings_window.get_settings()
             exclude_folders = current_settings.get('exclude_folders', [])
@@ -462,7 +436,7 @@ class ApplicationController(IApplicationController):
 
     def _browse_viewer_path(self):
         """外部ビューアのパスを参照する。"""
-        file_path = self._open_file_dialog("外部ビューアを選択", "実行ファイル (*.exe);;すべてのファイル (*.*)")
+        file_path = self.main_window.get_open_file_name("外部ビューアを選択", "実行ファイル (*.exe);;すべてのファイル (*.*)")
         if file_path:
             current_settings = self.settings_window.get_settings()
             current_settings['viewer_path'] = file_path
