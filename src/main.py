@@ -9,7 +9,7 @@ import os
 import subprocess
 import json
 from typing import Optional
-from PyQt6.QtCore import QModelIndex, Qt, QThread, QObject, pyqtSignal
+from PyQt6.QtCore import QThread, QObject, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog
 from PyQt6.QtGui import QFont
 from src.ui.main_window import MainWindow
