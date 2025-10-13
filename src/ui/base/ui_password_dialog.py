@@ -4,43 +4,45 @@ PasswordDialogのUI定義。
 """
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit, QLabel
+    QPushButton, QLineEdit, QLabel, QWidget
 )
 
 class Ui_PasswordDialog(object):
     """PasswordDialogのUI要素を定義するクラス。"""
-    def setupUi(self, PasswordDialog: QDialog, mode: str):
-        """UIのセットアップを行う。
-
-        Args:
-            PasswordDialog (QDialog): UIを構築する対象のダイアログインスタンス。
-            mode (str): ダイアログのモード ('authenticate' or 'set_password')。
-                        モードに応じて表示するウィジェットを切り替える。
-        """
-        PasswordDialog.setWindowTitle("パスワード認証" if mode == "authenticate" else "パスワード設定")
-        
+    def setupUi(self, PasswordDialog: QDialog):
+        """UIのセットアップを行う。"""
+        PasswordDialog.setWindowTitle("パスワード認証")
         main_layout = QVBoxLayout(PasswordDialog)
 
-        if mode == "authenticate":
-            main_layout.addWidget(QLabel("パスワードを入力してください:"))
-            self.password_input = QLineEdit()
-            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.password_input)
-        elif mode == "set_password":
-            main_layout.addWidget(QLabel("新しいパスワードを入力してください:"))
-            self.new_password_input = QLineEdit()
-            self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.new_password_input)
+        # --- 認証モード用ウィジェット ---
+        PasswordDialog.auth_widget = QWidget()
+        auth_layout = QVBoxLayout(PasswordDialog.auth_widget)
+        auth_layout.setContentsMargins(0, 0, 0, 0)
+        auth_layout.addWidget(QLabel("パスワードを入力してください:"))
+        PasswordDialog.password_input = QLineEdit()
+        PasswordDialog.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        auth_layout.addWidget(PasswordDialog.password_input)
+        main_layout.addWidget(PasswordDialog.auth_widget)
 
-            main_layout.addWidget(QLabel("新しいパスワード (確認):"))
-            self.confirm_password_input = QLineEdit()
-            self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            main_layout.addWidget(self.confirm_password_input)
+        # --- パスワード設定モード用ウィジェット ---
+        PasswordDialog.set_password_widget = QWidget()
+        set_password_layout = QVBoxLayout(PasswordDialog.set_password_widget)
+        set_password_layout.setContentsMargins(0, 0, 0, 0)
+        set_password_layout.addWidget(QLabel("新しいパスワードを入力してください:"))
+        PasswordDialog.new_password_input = QLineEdit()
+        PasswordDialog.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        set_password_layout.addWidget(PasswordDialog.new_password_input)
+        set_password_layout.addWidget(QLabel("新しいパスワード (確認):"))
+        PasswordDialog.confirm_password_input = QLineEdit()
+        PasswordDialog.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        set_password_layout.addWidget(PasswordDialog.confirm_password_input)
+        main_layout.addWidget(PasswordDialog.set_password_widget)
 
+        # --- ボタン ---
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        self.ok_button = QPushButton("OK" if mode == "authenticate" else "設定")
-        self.cancel_button = QPushButton("キャンセル")
-        button_layout.addWidget(self.ok_button)
-        button_layout.addWidget(self.cancel_button)
+        PasswordDialog.ok_button = QPushButton("OK")
+        PasswordDialog.cancel_button = QPushButton("キャンセル")
+        button_layout.addWidget(PasswordDialog.ok_button)
+        button_layout.addWidget(PasswordDialog.cancel_button)
         main_layout.addLayout(button_layout)

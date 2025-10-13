@@ -89,3 +89,5 @@ class Ui_SettingsWindow(object):
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.cancel_button)
         main_layout.addLayout(button_layout)
+
+        SettingsWindow.setLayout(main_layout) # レイアウトを適用

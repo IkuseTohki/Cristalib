@@ -25,6 +25,7 @@ class Book:
         file_path (Optional[str]): ファイルシステム上のパス。
         file_hash (Optional[str]): ファイルのハッシュ値。
         created_at (Optional[str]): データベースに登録された日時。
+        is_private (bool): この書籍がプライベートフォルダに属するかどうかのフラグ。
     """
     id: Optional[int] = None
     title: Optional[str] = None
@@ -39,3 +40,4 @@ class Book:
     file_path: Optional[str] = None
     file_hash: Optional[str] = None
     created_at: Optional[str] = None
+    is_private: bool = False

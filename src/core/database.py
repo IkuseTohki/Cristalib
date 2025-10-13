@@ -103,15 +103,72 @@ class DatabaseManager:
             row = cursor.fetchone()
             return Book(**row) if row else None
 
-    def get_all_books(self) -> List[Book]:
-        """データベース上のすべての書籍情報を取得する。
+    def get_book_by_id(self, book_id: int) -> Optional[Book]:
+        """IDを基に書籍情報を取得する。
+
+        Args:
+            book_id (int): 検索する書籍のID。
 
         Returns:
-            List[Book]: すべての書籍情報を含むBookオブジェクトのリスト。
+            Optional[Book]: 見つかった書籍のBookオブジェクト。見つからなければNone。
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute("SELECT * FROM books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
+            return Book(**row) if row else None
+
+    def get_all_books(self) -> List[Book]:
+        """データベース上のすべての書籍情報を取得する（プライベート属性は考慮しない）。
+
+        Returns:
+            List[Book]: 書籍情報を含むBookオブジェクトのリスト。
         """
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM books")
-            return [Book(**row) for row in cursor.fetchall()]
+            return [Book(**dict(row)) for row in cursor.fetchall()]
+
+    def get_books_for_display(self, private_mode: bool = False) -> List[Book]:
+        """表示用に、プライベートモードを考慮してデータベース上の書籍情報を取得する。
+
+        Args:
+            private_mode (bool): プライベートモードが有効な場合はTrue。
+
+        Returns:
+            List[Book]: 書籍情報を含むBookオブジェクトのリスト。
+        """
+        with self.get_connection() as conn:
+            # 各書籍について、最も一致長の長いスキャンフォルダのis_private属性をサブクエリで取得
+            base_query = """
+                SELECT
+                    b.*,
+                    COALESCE((
+                        SELECT sf.is_private
+                        FROM scan_folders sf
+                        WHERE b.file_path LIKE sf.path || '%'
+                        ORDER BY LENGTH(sf.path) DESC
+                        LIMIT 1
+                    ), 0) as is_private
+                FROM
+                    books b
+            """
+
+            # 通常モードの場合、プライベートな書籍を除外するWHERE句を追加
+            if not private_mode:
+                query = f"""
+                    SELECT * FROM ({base_query})
+                    WHERE is_private = 0
+                """
+            else:
+                query = base_query
+
+            cursor = conn.execute(query)
+
+            # Bookオブジェクトのリストを作成
+            books = []
+            for row in cursor.fetchall():
+                book_data = dict(row)
+                books.append(Book(**book_data))
+            return books
 
     def update_book_path(self, file_hash: str, new_path: str):
         """書籍のファイルパスを更新する。

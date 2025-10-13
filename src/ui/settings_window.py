@@ -5,27 +5,36 @@
                   アプリケーション設定を行うUIを提供します。
 - PasswordDialog: パスワードの認証や新規設定を行うためのUIを提供します。
 """
-from typing import List, Dict, Tuple, Optional, Callable
-from PyQt6.QtCore import QStringListModel, Qt
+from typing import List, Dict, Tuple, Optional, Any
+from PyQt6.QtCore import QStringListModel, Qt, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QWidget, QFileDialog, QMessageBox
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 from .base.ui_settings_window import Ui_SettingsWindow
 from .base.ui_password_dialog import Ui_PasswordDialog
+from .interfaces import ISettingsWindow, IPasswordDialog
 
 
-class SettingsWindow(QDialog, Ui_SettingsWindow):
+class SettingsWindow(QDialog, Ui_SettingsWindow, ISettingsWindow):
     """設定画面のウィンドウ。
 
     UIのロジックとPresenterとの連携を担当します。
     UIのレイアウト定義はUi_SettingsWindowクラスに分離されています。
     """
-    def __init__(self, parent: Optional[QWidget] = None, change_password_callback: Optional[Callable] = None):
+    # ISettingsWindowで定義された抽象シグナルを実装
+    save_settings_requested = pyqtSignal()
+    change_password_requested = pyqtSignal()
+    add_scan_path_requested = pyqtSignal()
+    remove_scan_path_requested = pyqtSignal()
+    add_exclude_path_requested = pyqtSignal()
+    remove_exclude_path_requested = pyqtSignal()
+    browse_viewer_path_requested = pyqtSignal()
+
+    def __init__(self, parent: Optional[QWidget] = None):
         """SettingsWindowのコンストラクタ。
 
         Args:
-            parent (Optional[QWidget], optional): 親ウィジェット。Defaults to None.
-            change_password_callback (Optional[Callable], optional): パスワード変更ボタンが押されたときに呼び出されるコールバック関数。
+            parent (Optional[QWidget]): 親ウィジェット。Defaults to None.
         """
         super().__init__(parent)
         self.setupUi(self)
@@ -37,58 +46,28 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         self.exclude_list_view.setModel(self.exclude_list_model)
 
         # --- シグナルの接続 ---
-        self.add_scan_btn.clicked.connect(self.add_scan_folder)
-        self.remove_scan_btn.clicked.connect(self.remove_scan_folder)
-        self.add_exclude_btn.clicked.connect(self.add_exclude_folder)
-        self.remove_exclude_btn.clicked.connect(self.remove_exclude_folder)
-        self.browse_viewer_btn.clicked.connect(self.browse_viewer_path)
-        self.save_button.clicked.connect(self.accept)
-        self.cancel_button.clicked.connect(self.reject)
+        self.save_button.clicked.connect(self.save_settings_requested.emit)
+        self.cancel_button.clicked.connect(self.close)
+        self.change_password_btn.clicked.connect(self.change_password_requested.emit)
+        self.add_scan_btn.clicked.connect(self.add_scan_path_requested.emit)
+        self.remove_scan_btn.clicked.connect(self.remove_scan_path_requested.emit)
+        self.add_exclude_btn.clicked.connect(self.add_exclude_path_requested.emit)
+        self.remove_exclude_btn.clicked.connect(self.remove_exclude_path_requested.emit)
+        self.browse_viewer_btn.clicked.connect(self.browse_viewer_path_requested.emit)
 
-        if change_password_callback:
-            self.change_password_btn.clicked.connect(change_password_callback)
+        self.adjustSize()  # ウィジェットのサイズを調整
 
-    def add_scan_folder(self):
-        """「スキャン対象フォルダを追加」ボタンのアクション。"""
-        path = QFileDialog.getExistingDirectory(self, "スキャン対象フォルダを選択")
-        if path:
-            item = QStandardItem(path)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Unchecked)
-            self.scan_list_model.appendRow(item)
-
-    def remove_scan_folder(self):
-        """「スキャン対象フォルダを削除」ボタンのアクション。"""
-        for index in self.scan_list_view.selectedIndexes():
-            self.scan_list_model.removeRow(index.row())
-
-    def add_exclude_folder(self):
-        """「除外フォルダを追加」ボタンのアクション。"""
-        path = QFileDialog.getExistingDirectory(self, "除外フォルダを選択")
-        if path:
-            self.exclude_list_model.insertRow(self.exclude_list_model.rowCount())
-            self.exclude_list_model.setData(self.exclude_list_model.index(self.exclude_list_model.rowCount() - 1), path)
-
-    def remove_exclude_folder(self):
-        """「除外フォルダを削除」ボタンのアクション。"""
-        for index in self.exclude_list_view.selectedIndexes():
-            self.exclude_list_model.removeRow(index.row())
-
-    def browse_viewer_path(self):
-        """「ビューア参照」ボタンのアクション。"""
-        path, _ = QFileDialog.getOpenFileName(self, "ビューアを選択")
-        if path:
-            self.viewer_path_input.setText(path)
-
-    def set_settings(self, scan_folders: List[Dict], exclude_folders: List[Dict], viewer_path: str, scan_extensions: str):
-        """既存の設定をダイアログに表示する。
+    def display_settings(self, settings: Dict[str, Any]):
+        """設定情報をUIに表示する。
 
         Args:
-            scan_folders (List[Dict]): スキャン対象フォルダのリスト。
-            exclude_folders (List[Dict]): 除外フォルダのリスト。
-            viewer_path (str): ビューアのパス。
-            scan_extensions (str): 対象拡張子のカンマ区切り文字列。
+            settings (Dict[str, Any]): 表示する設定情報を含む辞書。
         """
+        scan_folders = settings.get('scan_folders', [])
+        exclude_folders = settings.get('exclude_folders', [])
+        viewer_path = settings.get('viewer_path', '')
+        scan_extensions = settings.get('scan_extensions', '')
+
         self.scan_list_model.clear()
         for folder in scan_folders:
             item = QStandardItem(folder['path'])
@@ -100,12 +79,11 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         self.viewer_path_input.setText(viewer_path or "")
         self.scan_extensions_input.setText(scan_extensions or "")
 
-    def get_settings(self) -> Tuple[List[Dict], List[Dict], str, str]:
-        """ダイアログで設定された内容を取得する。
+    def get_settings(self) -> Dict[str, Any]:
+        """UIから現在の設定値を取得する。
 
         Returns:
-            Tuple[List[Dict], List[Dict], str, str]:
-                スキャン対象フォルダ、除外フォルダ、ビューアパス、対象拡張子のタプル。
+            Dict[str, Any]: 現在の設定値を含む辞書。
         """
         scan_folders = []
         for row in range(self.scan_list_model.rowCount()):
@@ -118,37 +96,93 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         exclude_folders = [{'path': path} for path in self.exclude_list_model.stringList()]
         viewer_path = self.viewer_path_input.text()
         scan_extensions = self.scan_extensions_input.text()
-        return scan_folders, exclude_folders, viewer_path, scan_extensions
+
+        return {
+            'scan_folders': scan_folders,
+            'exclude_folders': exclude_folders,
+            'viewer_path': viewer_path,
+            'scan_extensions': scan_extensions
+        }
+
+    def display_scan_paths(self, scan_paths: List[str]):
+        """スキャンパスのリストをUIに表示する。
+
+        Args:
+            scan_paths (List[str]): 表示するスキャンパスのリスト。
+        """
+        self.scan_list_model.clear()
+        for path in scan_paths:
+            item = QStandardItem(path)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked) # デフォルトはUnchecked
+            self.scan_list_model.appendRow(item)
+
+    def get_scan_paths(self) -> List[str]:
+        """UIから現在のスキャンパスのリストを取得する。
+
+        Returns:
+            List[str]: 現在のスキャンパスのリスト。
+        """
+        scan_paths = []
+        for row in range(self.scan_list_model.rowCount()):
+            item = self.scan_list_model.item(row)
+            scan_paths.append(item.text())
+        return scan_paths
+
+    def get_selected_scan_paths(self) -> List[str]:
+        """UIから選択されているスキャンパスのリストを取得する。
+
+        Returns:
+            List[str]: 選択されているスキャンパスのリスト。
+        """
+        selected_paths = []
+        for index in self.scan_list_view.selectedIndexes():
+            item = self.scan_list_model.itemFromIndex(index)
+            if item:
+                selected_paths.append(item.text())
+        return selected_paths
+
+    def get_selected_exclude_paths(self) -> List[str]:
+        """UIから選択されている除外パスのリストを取得する。
+
+        Returns:
+            List[str]: 選択されている除外パスのリスト。
+        """
+        selected_paths = []
+        for index in self.exclude_list_view.selectedIndexes():
+            path = self.exclude_list_model.data(index, Qt.ItemDataRole.DisplayRole)
+            if path:
+                selected_paths.append(path)
+        return selected_paths
+
+    def show(self):
+        """設定ウィンドウを表示する。"""
+        super().show()
+
+    def close(self):
+        """設定ウィンドウを閉じる。"""
+        super().close()
 
 
-class PasswordDialog(QDialog, Ui_PasswordDialog):
+class PasswordDialog(QDialog, Ui_PasswordDialog, IPasswordDialog):
     """パスワード入力または設定を行うダイアログ。
 
     'authenticate'モードと'set_password'モードに応じてUIと動作を切り替えます。
     """
-    def __init__(self, parent: Optional[QWidget] = None, mode: str = "authenticate"):
+    def __init__(self, parent: Optional[QWidget] = None):
         """PasswordDialogのコンストラクタ。
 
         Args:
-            parent (Optional[QWidget], optional): 親ウィジェット。Defaults to None.
-            mode (str, optional): ダイアログのモード ('authenticate' or 'set_password')。
-                                  Defaults to "authenticate".
+            parent (Optional[QWidget]): 親ウィジェット。Defaults to None.
         """
         super().__init__(parent)
-        self.setupUi(self, mode)
-        self.mode = mode
+        self.setupUi(self)
+        self.set_mode('authenticate')  # 初期モードはauthenticateとする
+        self._password_on_accept = None  # 入力されたパスワードを一時的に保持
 
         # --- シグナルの接続 ---
-        self.ok_button.clicked.connect(self._handle_ok_button)
+        self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
-
-    def _handle_ok_button(self):
-        """OKボタンがクリックされたときの処理。"""
-        if self.mode == "authenticate":
-            self.accept()
-        elif self.mode == "set_password":
-            if self.validate_password_input():
-                self.accept()
 
     def validate_password_input(self) -> bool:
         """パスワード設定時の入力値を検証する。
@@ -173,8 +207,47 @@ class PasswordDialog(QDialog, Ui_PasswordDialog):
         Returns:
             Optional[str]: 入力されたパスワード文字列。キャンセルされた場合はNone。
         """
-        if self.mode == "authenticate":
-            return self.password_input.text()
-        elif self.mode == "set_password":
-            return self.new_password_input.text()
-        return None
+        return self._password_on_accept
+
+    def clear_input_fields(self):
+        """パスワード入力欄をクリアする。"""
+        self.password_input.clear()
+        self.new_password_input.clear()
+        self.confirm_password_input.clear()
+
+    def set_mode(self, mode: str):
+        """ダイアログのモードを設定し、表示ウィジェットを切り替える。
+
+        Args:
+            mode (str): ダイアログのモード ("authenticate" または "set_password")。
+        """
+        self.mode = mode
+        if mode == "authenticate":
+            self.setWindowTitle("パスワード認証")
+            self.auth_widget.show()
+            self.set_password_widget.hide()
+            self.ok_button.setText("OK")
+        elif mode == "set_password":
+            self.setWindowTitle("パスワード設定")
+            self.auth_widget.hide()
+            self.set_password_widget.show()
+            self.ok_button.setText("設定")
+        self.adjustSize()
+
+    def exec(self) -> int:
+        """ダイアログを表示し、結果を返す。
+
+        Returns:
+            int: ダイアログの実行結果 (QDialog.DialogCode.Accepted または QDialog.DialogCode.Rejected)。
+        """
+        return super().exec()
+
+    def accept(self):
+        """OKボタンが押されたとき、またはEnterキーが押されたときに呼び出される。"""
+        if self.mode == "set_password":
+            if not self.validate_password_input():
+                return  # 検証失敗ならダイアログを閉じない
+            self._password_on_accept = self.new_password_input.text()
+        elif self.mode == "authenticate":
+            self._password_on_accept = self.password_input.text()
+        super().accept()  # 検証成功、または認証モードならダイアログを閉じる
